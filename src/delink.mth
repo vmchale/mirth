@@ -4,7 +4,7 @@ import(prelude)
 
 def-type(Stat*, Ptr)
 
-def-external(lstat, Str -- Stat* -- +File)
+def-external(lstat, Str Stat* -- +File)
 
 def(delink!, Str -- +IO,
     "Not yet implemented" panic!
