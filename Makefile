@@ -90,4 +90,4 @@ bin/delink.c: src/delink.mth bin/mirth0
 	./bin/mirth0 $(notdir $^)
 
 bin/delink: bin/delink.c
-	$(CC) -o bin/delink bin/delink.c
+	gcc -O2 -o bin/delink bin/delink.c
