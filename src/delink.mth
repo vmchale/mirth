@@ -2,10 +2,10 @@ module(delink)
 
 import(prelude)
 
-def-type(Stat*, Ptr)
+def-external(realpath, Str Ptr -- Str +File +Mem)
+def-external(remove, Str -- Int +File)
 
-def-external(lstat, Str Stat* -- +File)
-
+# based on https://stackoverflow.com/questions/18159662/get-real-path-of-a-symlink
 def(delink!, Str -- +IO,
     "Not yet implemented" panic!
 )
