@@ -1,0 +1,14 @@
+module(delink)
+
+import(prelude)
+
+def(delink!, Str -- +IO,
+    "Not yet implemented" panic!
+)
+
+def (delink-main, +IO,
+    1 argc < if(
+        1 argv ptr@@ delink!,
+        "delink takes a filename on the command-line" panic!))
+
+target-c99("delink.c", delink-main)
