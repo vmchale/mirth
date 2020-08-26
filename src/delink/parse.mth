@@ -1,0 +1,9 @@
+module(delink/parse)
+
+import(prelude)
+
+def(help!, -- +IO,
+    "delink - resolve symlinks" str-print-ln!)
+
+def(version!, -- +IO,
+    "delink version 0.1.0\n\nCopyright (c) 2020 Vanessa McHale" str-print-ln!)

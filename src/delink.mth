@@ -1,19 +1,33 @@
 module(delink)
 
 import(prelude)
+import(delink/parse)
+
+def-type(FILE*, Ptr)
 
 def-external(realpath, Str Ptr -- Str +File +Mem)
 def-external(remove, Str -- Int +File)
 
+def-external(fopen, Str Str -- FILE* +File)
+def-external(fclose, FILE* -- Int +File)
+
+buffer(FILE_BUFFER, 32768) # 32kB
+
+def(realpath!, Str -- Str +File +Mem,
+    0 cast realpath
+)
+
 # based on https://stackoverflow.com/questions/18159662/get-real-path-of-a-symlink
 def(delink!, Str -- +IO,
-    0 cast realpath
+    dup
+    realpath!
+    drop # remove
     str-print-ln!
 )
 
 def (delink-main, +IO,
     1 argc < if(
-        1 argv ptr@@ delink!,
+        1 argv ptr@@ delink!, # cargo culted from mirth compiler
         "delink takes a filename on the command-line" panic!))
 
 target-c99("delink.c", delink-main)

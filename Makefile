@@ -86,7 +86,7 @@ bin/snake.c: bin/mirth0 $(SRCS)
 bin/snake: bin/snake.c
 	$(CC) -o bin/snake bin/snake.c `pkg-config --libs sdl2`
 
-bin/delink.c: src/delink.mth bin/mirth0
+bin/delink.c: src/delink.mth src/delink/parse.mth bin/mirth0
 	./bin/mirth0 $(notdir $^)
 
 bin/delink: bin/delink.c
