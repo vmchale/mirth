@@ -13,8 +13,11 @@ def-external(fclose, FILE* -- Int +File)
 
 buffer(FILE_BUFFER, 32768) # 32kB
 
+def(null-ptr, -- Ptr,
+    0 cast)
+
 def(realpath!, Str -- Str +File +Mem,
-    0 cast realpath
+   null-ptr realpath
 )
 
 # based on https://stackoverflow.com/questions/18159662/get-real-path-of-a-symlink
