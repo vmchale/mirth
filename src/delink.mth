@@ -7,7 +7,8 @@ def-external(remove, Str -- Int +File)
 
 # based on https://stackoverflow.com/questions/18159662/get-real-path-of-a-symlink
 def(delink!, Str -- +IO,
-    "Not yet implemented" panic!
+    0 cast realpath
+    str-print-ln!
 )
 
 def (delink-main, +IO,
