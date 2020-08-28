@@ -11,6 +11,9 @@ def-external(remove, Str -- Int +File)
 def-external(fopen, Str Str -- FILE* +File)
 def-external(fclose, FILE* -- Int +File)
 
+def-external(fread, Ptr Size Size FILE* -- Size +File)
+def-external(fwrite, Ptr Size Size FILE* -- Size +File)
+
 buffer(FILE_BUFFER, 32768) # 32kB
 
 def(null-ptr, -- Ptr,
@@ -20,12 +23,17 @@ def(realpath!, Str -- Str +File +Mem,
    null-ptr realpath
 )
 
+# from, to
+def(copy-file!, Str Str -- +File +IO,
+    str-print-ln!
+    str-print-ln!
+)
+
 # based on https://stackoverflow.com/questions/18159662/get-real-path-of-a-symlink
 def(delink!, Str -- +IO,
     dup
     realpath!
-    drop # remove
-    str-print-ln!
+    copy-file!
 )
 
 def (delink-main, +IO,
