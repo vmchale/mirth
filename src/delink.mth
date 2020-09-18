@@ -3,16 +3,13 @@ module(delink)
 import(prelude)
 import(delink/parse)
 
-def-type(FILE*, Ptr)
-
 def-external(realpath, Str Ptr -- Str +File +Mem)
 def-external(remove, Str -- Int +File)
 
-def-external(fopen, Str Str -- FILE* +File)
-def-external(fclose, FILE* -- Int +File)
+def-external(fread, Ptr Size Size File -- Size +File)
+def-external(fwrite, Ptr Size Size File -- Size +File)
 
-def-external(fread, Ptr Size Size FILE* -- Size +File)
-def-external(fwrite, Ptr Size Size FILE* -- Size +File)
+def-external(memcpy, Ptr Ptr Size -- Size +Mem)
 
 buffer(FILE_BUFFER, 32768) # 32kB
 
