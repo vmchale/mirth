@@ -14,9 +14,6 @@ field(buffer-size, Buffer, Size)
 field(buffer-base, Buffer, Ptr)
 field(buffer-name, Buffer, Name)
 
-# mirth/data/location
-nominal(Row, U16)
-nominal(Col, U16)
 
 # mirth/data/module
 table(Module)
@@ -24,6 +21,11 @@ table(Token)
 field(module-name, Module, Name)
 field(module-start, Module, Token)
 field(module-end, Module, Token)
+
+# mirth/data/location
+nominal(Row, Int)
+nominal(Col, Int)
+nominal(Location, [Module Row Col])
 
 # mirth/data/token
 nominal(TokenType, U8)
@@ -42,18 +44,47 @@ table(ParamType)
 table(Param)
 table(MetaVar)
 table(Nominal)
+table(AppType)
+table(Data)
+table(Tag)
+table(Ctx)
+
 field(tensor-type-snd, TensorType, Type)
 field(tensor-type-fst, TensorType, Type)
+
 field(morphism-type-cod, MorphismType, Type)
 field(morphism-type-dom, MorphismType, Type)
+
 field(meta-is-defined, MetaVar, Bool)
 field(meta-type-raw, MetaVar, Type)
+
 field(nominal-type, Nominal, Type)
 field(nominal-name, Nominal, Name)
+field(nominal-arity, Nominal, Int)
+
 field(param-type-params, ParamType, Param)
 field(param-type-body, ParamType, Type)
+
+field(param-name, Param, Name)
 field(param-type, Param, Type)
 field(param-next, Param, Param)
+
+field(app-type-fun, AppType, Type)
+field(app-type-arg, AppType, Type)
+
+field(data-header, Data, Token)
+field(data-name, Data, Name)
+field(data-arity, Data, Int)
+field(data-tags, Data, Tag)
+
+field(tag-data, Tag, Data)
+field(tag-name, Tag, Name)
+field(tag-sig, Tag, Token)
+field(tag-has-sig, Tag, Bool)
+field(tag-sig-is-checked, Tag, Bool)
+field(tag-ctx, Tag, Ctx)
+field(tag-type, Tag, Type)
+field(tag-next, Tag, Tag)
 
 # mirth/data/var
 table(Var)
@@ -61,8 +92,13 @@ field(var-is-implicit, Var, Bool)
 field(var-name, Var, Name)
 field(var-type, Var, Type)
 
+# mirth/data/type
+table(Subst)
+field(subst-rest, Subst, Subst)
+field(subst-var, Subst, Var)
+field(subst-type, Subst, Type)
+
 # mirth/data/ctx
-table(Ctx)
 field(ctx-prev, Ctx, Ctx)
 field(ctx-var, Ctx, Var)
 
@@ -73,12 +109,6 @@ field(external-type, External, Type)
 field(external-sig, External, Token)
 field(external-ctx, External, Ctx)
 field(external-flags, External, Int)
-
-# mirth/data/subst
-table(Subst)
-field(subst-rest, Subst, Subst)
-field(subst-var, Subst, Var)
-field(subst-type, Subst, Type)
 
 # mirth/data/arrow
 table(Arrow)
