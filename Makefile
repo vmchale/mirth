@@ -1,9 +1,9 @@
-C99FLAGS=-std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Werror -pedantic
+C99FLAGS=-std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wno-missing-braces -Werror -pedantic -O1 -g
 CC=gcc $(C99FLAGS)
 
-SRCS=src/*.mth src/prelude/*.mth src/mirth/*.mth src/mirth/data/*.mth
+SRCS=src/*.mth src/mirth/*.mth src/mirth/data/*.mth
 
-.PHONY: default show build update check update-mirth install-vim install-code profile play-snake test test-update
+.PHONY: default show build update check update-mirth install-vim install-code install profile play-snake test test-update
 
 default: show
 
@@ -38,6 +38,9 @@ install-code:
 install-atom:
 	apm link tools/mirth-atom
 
+install: bin/mirth0
+	./install.sh bin/mirth0
+
 profile: bin/mirth_prof
 	time bin/mirth_prof
 	rm -f bin/mirth.c
@@ -52,7 +55,6 @@ test-update:
 	bash mirth-test.sh -u
 
 #########
-
 
 bin/mirth0: bin/mirth0.c
 	$(CC) -o bin/mirth0 bin/mirth0.c

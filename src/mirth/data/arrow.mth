@@ -1,7 +1,5 @@
 module(mirth/data/arrow)
-import(mirth/data/subst)
 import(mirth/data/common)
-import(mirth/data/word)
 import(mirth/data/prim)
 
 ##########
@@ -21,185 +19,94 @@ import(mirth/data/prim)
 # sequence of atomic morphisms. Atomic morphisms are morphisms that
 # can't be broken down into a composition. These include calling
 # words, primitives, control flow, and literal values. This is a
-# nested intermediate representation, but, to reduce indirection,
-# we represent it as a flat sequence.
+# nested intermediate representation.
 
 # Originally this type was called Morphism but that's hard to spell and
-# to type repeatedly so now they're called Arrow :-)
-
-def(Arrow->Int, Arrow -- Int, cast)
-def(Int->Arrow, Int -- Arrow, cast)
-
-def(ARROW_NIL, Arrow, 0 Int->Arrow)
-def(arrow-is-nil?, Arrow -- Arrow Bool, dup ARROW_NIL =)
-
-def(MAX_ARROWS, Size, 0x20000)
-def(arrow-alloc!, Arrow,
-    Arrow.alloc!
-    dup Arrow->Int MAX_ARROWS >= if(
-        "Compiler error: Ran out of arrows! Increase MAX_ARROWS!" panic!,
-        id
-    ))
-
-def(Op->U8, Op -- U8, cast)
-def(U8->Op, U8 -- Op, cast)
-def(Op->Int, Op -- Int, Op->U8 U8->Int)
-def(Int->Op, Int -- Op, Int->U8 U8->Op)
-def(|Op|, Size, 1)
-def(op@, Ptr -- Op, u8@ U8->Op)
-def(op!, Op Ptr --, dip(Op->U8) u8!)
-def(OP_NONE, Op, 0 Int->Op)
-def(OP_PRIM, Op, 1 Int->Op)
-def(OP_WORD, Op, 2 Int->Op)
-def(OP_EXTERNAL, Op, 3 Int->Op)
-def(OP_BUFFER, Op, 4 Int->Op)
-def(OP_INT, Op, 5 Int->Op)
-def(OP_STR, Op, 6 Int->Op)
-
-def(arrow-op-is-none?, Arrow -- Arrow Bool, arrow-op? OP_NONE =)
-def(arrow-op-is-prim?, Arrow -- Arrow Bool, arrow-op? OP_PRIM =)
-def(arrow-op-is-word?, Arrow -- Arrow Bool, arrow-op? OP_WORD =)
-def(arrow-op-is-external?, Arrow -- Arrow Bool, arrow-op? OP_EXTERNAL =)
-def(arrow-op-is-buffer?, Arrow -- Arrow Bool, arrow-op? OP_BUFFER =)
-def(arrow-op-is-int?, Arrow -- Arrow Bool, arrow-op? OP_INT =)
-def(arrow-op-is-str?, Arrow -- Arrow Bool, arrow-op? OP_STR =)
-
-def(arrow-op-prim!, Prim Arrow --,
-    OP_PRIM over arrow-op!
-    dip(Prim->Int) arrow-op-value!)
-def(arrow-op-prim@, Arrow -- Prim,
-    arrow-op? OP_PRIM = if(
-        arrow-op-value@ Int->Prim,
-        "compiler error: attempted to get prim associated with non-prim arrow" panic!
-    ))
-def(arrow-op-prim?, Arrow -- Arrow Prim,
-    dup arrow-op-prim@)
-
-def(arrow-op-word!, Word Arrow --,
-    OP_WORD over arrow-op!
-    dip(Word->Int) arrow-op-value!)
-def(arrow-op-word@, Arrow -- Word,
-    arrow-op? OP_WORD = if(
-        arrow-op-value@ Int->Word,
-        "compiler error: attempted to get word associated with non-word arrow" panic!
-    ))
-def(arrow-op-word?, Arrow -- Arrow Word,
-    dup arrow-op-word@)
-
-def(arrow-op-external!, External Arrow --,
-    OP_EXTERNAL over arrow-op!
-    dip(External->Int) arrow-op-value!)
-def(arrow-op-external@, Arrow -- External,
-    arrow-op? OP_EXTERNAL = if(
-        arrow-op-value@ Int->External,
-        "compiler error: attempted to get external associated with non-external arrow" panic!
-    ))
-def(arrow-op-external?, Arrow -- Arrow External,
-    dup arrow-op-external@)
-
-def(arrow-op-buffer!, Buffer Arrow --,
-    OP_BUFFER over arrow-op!
-    dip(Buffer->Int) arrow-op-value!)
-def(arrow-op-buffer@, Arrow -- Buffer,
-    arrow-op? OP_BUFFER = if(
-        arrow-op-value@ Int->Buffer,
-        "compiler error: attempted to get external associated with non-external arrow" panic!
-    ))
-def(arrow-op-buffer?, Arrow -- Arrow Buffer,
-    dup arrow-op-buffer@)
-
-def(arrow-op-int!, Int Arrow --,
-    OP_INT over arrow-op!
-    arrow-op-value!)
-def(arrow-op-int@, Arrow -- Int,
-    arrow-op? OP_INT = if(
-        arrow-op-value@,
-        "compiler error: attempted to get int associated with non-int arrow" panic!
-    ))
-def(arrow-op-int?, Arrow -- Arrow Int,
-    dup arrow-op-int@)
-
-def(arrow-op-str!, StrLit Arrow --,
-    OP_STR over arrow-op!
-    dip(StrLit->Int) arrow-op-value!)
-def(arrow-op-str@, Arrow -- StrLit,
-    arrow-op? OP_STR = if(
-        arrow-op-value@ Int->StrLit,
-        "compiler error: attempted to get str associated with non-str arrow" panic!
-    ))
-def(arrow-op-str?, Arrow -- Arrow StrLit,
-    dup arrow-op-str@)
+# to type repeatedly so now it's called Arrow :-)
 
 #######
 # ARG #
 #######
 
-def(Arrow->Arg, Arrow -- Arg, cast)
-def(Arg->Arrow, Arg -- Arrow, cast)
+||| Add arg to atom.
+atom-arg-add! : Atom Arg -- Atom
+atom-arg-add! = dip(atom-args?) snoc over atom-args!
 
-########
-# ARGS #
-########
+||| Add arg to last atom of arrow.
+||| Will panic if arrow has no atoms.
+arrow-arg-add! : Arrow Arg -- Arrow
+arrow-arg-add! =
+    over arrow-atoms@ last match(
+        NONE -> "arrow-arg-add! on empty arrow" panic!,
+        SOME -> swap atom-arg-add! drop
+    )
 
-def(Int->Args, Int -- Args, cast)
-def(Args->Int, Args -- Int, cast)
-def(args@, Ptr -- Args, @ Int->Args)
-def(args!, Args Ptr --, dip(Args->Int) !)
-def(args-alloc!, Args, Args.alloc!)
+||| Add atom to arrow.
+arrow-atom-add! : Arrow Atom -- Arrow
+arrow-atom-add! = dip(arrow-atoms?) snoc over arrow-atoms!
 
-def(ARGS_NIL, Args, 0 Int->Args)
-def(args-is-nil, Args -- Bool, ARGS_NIL =)
-def(args-is-nil?, Args -- Args Bool, dup args-is-nil)
+#########
+# BLOCK #
+#########
 
-def(args-len, Args -- Int,
-    0 swap while(args-is-nil? not, dip(1+) args-tail@) drop)
-
-# Get pointer to last args var in args list.
-def(arrow-args-last&, Arrow -- Ptr,
-    arrow-args& while(
-        dup args@ args-is-nil not,
-        args@ args-tail&
-    ))
-
-def(arrow-arg-add!, Arrow Arg -- Arrow,
-    args-alloc! tuck args-head!
-    over arrow-args-last& args!)
-
-def(arrow-args-0, Arrow --,
-    arrow-args?
-    args-len 0 = if(
-        drop,
-        arrow-token@ "compiler error: expected no args in arrow" emit-fatal-error!
-    ))
-
-def(arrow-args-1, Arrow -- Arg,
-    arrow-args?
-    args-len 1 = if(
-        arrow-args@ args-head@,
-        arrow-token@ "compiler error: expected 1 arg in arrow" emit-fatal-error!
-    ))
-
-def(arrow-args-2, Arrow -- Arg Arg,
-    arrow-args?
-    args-len 2 = if(
-        arrow-args@ args-head? swap
-        args-tail@ args-head@,
-
-        arrow-token@ "compiler error: expected 2 args in arrow" emit-fatal-error!
-    ))
+block-new! : Arrow -- Block
+block-new! = Block.alloc! tuck block-arrow!
 
 ####################################
 # Helpers for constructing arrows. #
 ####################################
+# TODO: Use an effect, or something, to elaborate these with types.
 
-def(arrow-new-int!, Int -- Arrow,  arrow-alloc! tuck arrow-op-int!)
-def(arrow-new-buffer!, Buffer -- Arrow, arrow-alloc! tuck arrow-op-buffer!)
-def(arrow-new-external!, External -- Arrow, arrow-alloc! tuck arrow-op-external!)
-def(arrow-new-prim!, Prim -- Arrow, arrow-alloc! tuck arrow-op-prim!)
-def(arrow-new-word!, Word -- Arrow,  arrow-alloc! tuck arrow-op-word!)
+atom-new-lambda! : Lambda -- Atom
+atom-new-lambda! = OP_LAMBDA Atom.alloc! tuck atom-op!
 
-def(arrow-push-int!, Arrow Int -- Arrow, arrow-new-int! tuck swap arrow-next!)
-def(arrow-push-buffer!, Arrow Buffer -- Arrow, arrow-new-buffer! tuck swap arrow-next!)
-def(arrow-push-external!, Arrow External -- Arrow, arrow-new-external! tuck swap arrow-next!)
-def(arrow-push-prim!, Arrow Prim -- Arrow, arrow-new-prim! tuck swap arrow-next!)
-def(arrow-push-word!, Arrow Word -- Arrow, arrow-new-word! tuck swap arrow-next!)
+atom-new-int! : Int -- Atom
+atom-new-int! = OP_INT Atom.alloc! tuck atom-op!
+
+atom-new-buffer! : Buffer -- Atom
+atom-new-buffer! = OP_BUFFER Atom.alloc! tuck atom-op!
+
+atom-new-external! : External -- Atom
+atom-new-external! = OP_EXTERNAL Atom.alloc! tuck atom-op!
+
+atom-new-prim! : Prim -- Atom
+atom-new-prim! = OP_PRIM Atom.alloc! tuck atom-op!
+
+atom-new-word! : Word -- Atom
+atom-new-word! = OP_WORD Atom.alloc! tuck atom-op!
+
+arrow-new-lambda! : Lambda -- Arrow
+arrow-new-lambda! = Arrow.alloc! swap arrow-push-lambda!
+
+arrow-new-int! : Int -- Arrow
+arrow-new-int! = Arrow.alloc! swap arrow-push-int!
+
+arrow-new-buffer! : Buffer -- Arrow
+arrow-new-buffer! = Arrow.alloc! swap arrow-push-buffer!
+
+arrow-new-external! : External -- Arrow
+arrow-new-external! = Arrow.alloc! swap arrow-push-external!
+
+arrow-new-prim! : Prim -- Arrow
+arrow-new-prim! = Arrow.alloc! swap arrow-push-prim!
+
+arrow-new-word! : Word -- Arrow
+arrow-new-word! = Arrow.alloc! swap arrow-push-word!
+
+arrow-push-lambda! : Arrow Lambda -- Arrow
+arrow-push-lambda! = atom-new-lambda! arrow-atom-add!
+
+arrow-push-int! : Arrow Int -- Arrow
+arrow-push-int! = atom-new-int! arrow-atom-add!
+
+arrow-push-buffer! : Arrow Buffer -- Arrow
+arrow-push-buffer! = atom-new-buffer! arrow-atom-add!
+
+arrow-push-external! : Arrow External -- Arrow
+arrow-push-external! = atom-new-external! arrow-atom-add!
+
+arrow-push-prim! : Arrow Prim -- Arrow
+arrow-push-prim! = atom-new-prim! arrow-atom-add!
+
+arrow-push-word! : Arrow Word -- Arrow
+arrow-push-word! = atom-new-word! arrow-atom-add!

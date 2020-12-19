@@ -1,12 +1,11 @@
-module(prelude/test)
-import(prelude/common)
+module(tests/test-prelude)
+import(prelude)
 
 # Assertions
 
-def(!!, Bool --, if(id, "Assertion failed" panic!))
-def(!!=, a a --, = !!)
-def(!!false, Bool --, false !!=)
-def(!!true, Bool --, true !!=)
+def(!!true, Bool --, if(id, "Assertion failed" panic!))
+def(!!false, Bool --, not !!true)
+def(!!=, a a --, == !!true)
 def(!!0, Int --, 0 !!=)
 def(!!1, Int --, 1 !!=)
 def(!!001, Int Int Int --, 1 !!= 0 !!= 0 !!=)
@@ -22,11 +21,27 @@ def(test-prelude!, --,
     test-trip test-rotr test-rotl test= test< test<= test> test>=
     test+ test- test* test/ test% test-str test-while
     test@!)
-def(test-if, --, 0 !!0 1 !!1 0 1 !!1 !!0)
+def(test-if, --,
+    0 !!0 1 !!1 0 1 !!1 !!0
+    true  [ 10 ] [ 20 ] if 20 !!=
+    false [ 10 ] [ 20 ] if 10 !!=
+    true  [ 30 ] if(20) 20 !!=
+    false [ 30 ] if(20) 30 !!=
+    # TODO: curried "if" is truly awful :-(
+    # ... if ever there was a reason to have arity-sensitive primitives, this is it?
+    # if should be special syntax, like match...
+    #   if(cond1 -> then1, cond2 -> then2, cond3 -> then3, else ...)
+    # with
+    #   if(then, else) as a special case???
+    )
+
 def(test-drop, --, 0 1 drop !!0)
 def(test-dup, --, 0 1 dup !!011)
 def(test-swap, --, 0 1 0 swap !!001)
-def(test-dip, --, 0 0 dip(1) !!010)
+def(test-dip, --,
+    0 0 dip(1) !!010
+    0 0 [1] dip !!010
+    0 0 [1 +] dip !!0 !!1)
 def(test-trip, --, 0 1 trip !!111 !!0)
 def(test-rotr, --,
     1 0 0 rotr !!010
@@ -38,13 +53,13 @@ def(test-rotl, --,
     0 0 1 rotl !!010)
 
 def(test=, --,
-    0 0 = !!true
-    0 1 = !!false
-    1 0 = !!false
-    1 1 = !!true
-    1 2 = !!false
-    2 1 = !!false
-    2 2 = !!true)
+    0 0 == !!true
+    0 1 == !!false
+    1 0 == !!false
+    1 1 == !!true
+    1 2 == !!false
+    2 1 == !!false
+    2 2 == !!true)
 def(test<, --,
     0 0 < !!false
     0 1 < !!true
@@ -88,8 +103,8 @@ def(test+, --,
     0 0 + !!0
     0 1 + !!1
     1 0 + !!1
-    1 1 + 2 = !!true
-    2 2 + 4 = !!true
+    1 1 + 2 == !!true
+    2 2 + 4 == !!true
     2 -2 + !!0)
 
 def(test-, --,
@@ -144,18 +159,18 @@ def(test%, --,
 buffer(TEST_BUF, 16)
 def(test@!, --,
     # reset test buffer
-    0 0 TEST_BUF quad!!
-    0 1 TEST_BUF quad!!
+    0 0 TEST_BUF int!!
+    0 1 TEST_BUF int!!
     # run test
-    0 TEST_BUF quad@@ !!0
-    1 TEST_BUF quad@@ !!0
-    99 0 TEST_BUF quad!!
-    0 TEST_BUF quad@@ 99 !!=
-    1 TEST_BUF quad@@ !!0
-    30 1 TEST_BUF quad!!
-    0 TEST_BUF quad@@ 99 !!=
-    1 TEST_BUF quad@@ 30 !!=
-    0 0 TEST_BUF quad!!
+    0 TEST_BUF int@@ !!0
+    1 TEST_BUF int@@ !!0
+    99 0 TEST_BUF int!!
+    0 TEST_BUF int@@ 99 !!=
+    1 TEST_BUF int@@ !!0
+    30 1 TEST_BUF int!!
+    0 TEST_BUF int@@ 99 !!=
+    1 TEST_BUF int@@ 30 !!=
+    0 0 TEST_BUF int!!
     0 TEST_BUF u8@@ U8->Int 0 !!=
     1 TEST_BUF u8@@ U8->Int 0 !!=
     2 TEST_BUF u8@@ U8->Int 0 !!=
@@ -168,20 +183,25 @@ def(test@!, --,
 
 def(test-str, --,
     "AaBb"
-    dup u8@ U8->Int 65 !!=
-    dup str-tail u8@ U8->Int 97 !!=
-    dup str-tail str-tail u8@ U8->Int 66 !!=
-    dup str-tail str-tail str-tail u8@ U8->Int 98 !!=
-    dup str-tail str-tail str-tail str-tail u8@ U8->Int 0 !!=
+    dup str-head U8->Int 65 !!=
+    dup str-tail str-head U8->Int 97 !!=
+    dup str-tail str-tail str-head U8->Int 66 !!=
+    dup str-tail str-tail str-tail str-head U8->Int 98 !!=
+    dup str-tail str-tail str-tail str-tail str-head U8->Int 0 !!=
     drop
 
     "" str-length 0 !!=
     "hello" str-length 5 !!=
     "hello, world!" str-length 13 !!=
+    "hello, " "world!" str-cat str-length int-trace! "\n" str-trace!
+    "hello, " "world!\n" str-cat str-trace!
     )
 
 def(test-while, --,
-    999 10 20 while(dup nonzero, 1- dip(1+)) drop 30 !!= 999 !!=)
+    999 10 20 while(dup nonzero, 1- dip(1+)) drop 30 !!= 999 !!=
+    10 20 [1- dip(1+)] while(dup 0 >) drop 30 !!=
+    30 40 [1- dip(1+)] [dup 0 >] while drop 70 !!=
+    )
 
 # Morphism quotes
 def(test-morphism-quote-id, [ Int -- Int ] -- [ Int -- Int ], id)
@@ -198,7 +218,7 @@ def(test-stack-assertions, -- ,
     1 2 { Int Int }
     3 4 { Int Int Int Int }
     + + + { Int }
-    10 =
+    10 ==
     { Bool }
     drop
 )
@@ -234,3 +254,7 @@ def(test-stack-assertions-dont-care, a b -- a b,
 
 def(test-dup2, -- Int Str Int Str,
     10 "hello" dup2)
+
+target-c99("prelude-test.c", test-prelude!)
+# mirth-test # perr # 13
+# mirth-test # perr # hello, world!

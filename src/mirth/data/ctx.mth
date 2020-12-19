@@ -7,48 +7,21 @@ import(mirth/data/var)
 ###########
 
 # A context for types and terms.
-def(Ctx->Int, Ctx -- Int, cast)
-def(Int->Ctx, Int -- Ctx, cast)
-def(|Ctx|, Size, 2)
-def(ctx@, Ptr -- Ctx, u16@ U16->Int Int->Ctx)
-def(ctx!, Ctx Ptr --, dip(Ctx->Int Int->U16) u16!)
 
-def(ctx-name@, Ctx -- Name, ctx-var@ var-name@)
+unCTX : Ctx -- List(Var)
+unCTX = match(CTX -> id)
 
-def(ctx-new!, Ctx Var -- Ctx,
-    Ctx.alloc!
-    tuck ctx-var!
-    tuck ctx-prev!)
+ctx-empty : Ctx
+ctx-empty = nil
 
-def(ctx-empty, Ctx, 0 Int->Ctx)
-def(ctx-is-empty, Ctx -- Bool, Ctx->Int 0 =)
-def(ctx-is-empty?, Ctx -- Ctx Bool, dup ctx-is-empty)
+ctx-new! : Ctx Var -- Ctx
+ctx-new! = dip(unCTX) snoc CTX
 
-def(ctx-has-name?, Name Ctx -- Name Ctx Bool, dup2 ctx-has-name)
-def(ctx-has-name, Name Ctx -- Bool,
-    ctx-is-empty? if(
-        drop2 false,
-        dup ctx-name@ dip(over) = if(
-            drop2 true,
-            ctx-prev@ ctx-has-name
-        )
-    ))
+ctx-vars : Ctx -- List(Var)
+ctx-vars = unCTX
 
-def(ctx-lookup?, Name Ctx -- Name Ctx Var, dup2 ctx-lookup)
-def(ctx-lookup, Name Ctx -- Var,
-    ctx-is-empty? if(
-        drop2 VAR_ERROR,
+ctx-physical-vars : Ctx -- List(Var)
+ctx-physical-vars = ctx-vars filter(var-is-physical?)
 
-        dup ctx-var@ var-name@ dip(over) = if(
-            ctx-var@ nip,
-            ctx-prev@ ctx-lookup
-        )
-   ))
-
-def(ctx-length?, Ctx -- Ctx Size, dup ctx-length)
-def(ctx-length, Ctx -- Size,
-    0 swap
-    while(ctx-is-empty? not,
-        dip(1+) ctx-prev@
-    )
-    drop)
+ctx-lookup : Name Ctx -- Maybe(Var)
+ctx-lookup = unCTX reverse-find(dup2 var-name@ ==) nip

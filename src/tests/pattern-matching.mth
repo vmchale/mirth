@@ -1,0 +1,72 @@
+
+module(tests/pattern-matching)
+import(prelude)
+
+data Foo
+    FOO0
+    FOO1 -> Int
+    FOO2 -> Int Int
+    FOO3 -> Int Int Int
+end
+
+foo-sum : Foo -- Int
+foo-sum =
+    match(
+        FOO0 -> 0,
+        FOO1 -> id,
+        FOO2 -> +,
+        FOO3 -> + +,
+    )
+
+foo-tag : Foo -- Str
+foo-tag =
+    match(
+        FOO0 -> "FOO0",
+        FOO1 -> drop "FOO1",
+        FOO2 -> drop2 "FOO2",
+        _ -> drop "FOO3"
+    )
+
+foo-display : Foo -- +IO
+foo-display = (
+    dup foo-tag str-print!
+    ", sum = " str-print!
+    dup foo-sum int-print!
+    ", values = " str-print!
+    match(
+        FOO0 ->
+            "[]" str-print-ln!,
+        FOO1 ->
+            "[ " str-print!
+            int-print! " ]" str-print-ln!,
+        FOO2 ->
+            "[ " str-print!
+            dip(int-print!) " " str-print!
+            int-print! " ]" str-print-ln!,
+        FOO3 ->
+            "[ " str-print!
+            dip2(int-print!) " " str-print!
+            dip(int-print!) " " str-print!
+            int-print! " ]" str-print-ln!,
+    )
+)
+
+main : +IO
+main = (
+    FOO0 foo-display
+    10 FOO1 foo-display
+    20 FOO1 foo-display
+    30 12 FOO2 foo-display
+    40 60 FOO2 foo-display
+    90 90 20 FOO3 foo-display
+    9000 0 1 FOO3 foo-display
+)
+
+target-c99("pattern-matching.c", main)
+# mirth-test # pout # FOO0, sum = 0, values = []
+# mirth-test # pout # FOO1, sum = 10, values = [ 10 ]
+# mirth-test # pout # FOO1, sum = 20, values = [ 20 ]
+# mirth-test # pout # FOO2, sum = 42, values = [ 30 12 ]
+# mirth-test # pout # FOO2, sum = 100, values = [ 40 60 ]
+# mirth-test # pout # FOO3, sum = 200, values = [ 90 90 20 ]
+# mirth-test # pout # FOO3, sum = 9001, values = [ 9000 0 1 ]

@@ -13,8 +13,8 @@ endif
 syntax iskeyword 33,36-39,42-43,45-57,59-90,94-95,97-122,124,126
 
 " reserved words -- these have special syntactic meaning
-syntax keyword mirthReserved export import type data end = == --
-syntax keyword mirthSpecial ->
+syntax keyword mirthReserved export import type data end = --
+syntax keyword mirthSpecial -> \\
 
 " prelude words
 syntax keyword mirthWord dup drop id swap dip nip tuck over rotl rotr par both
@@ -42,7 +42,7 @@ syntax match mirthWord "\v0[A-WYZa-wyz_\-?+*~!\@\$%\^&=/\|<>'][0-9a-zA-Z_\-?+*~!
 syntax match mirthWord "\v0[0-9][0-9]*[A-Za-z_\-?+*~!\@\$%\^&=/\|<>'][0-9a-zA-Z_\-?+*~!\@\$%\^&=/\|<>']*"
 syntax match mirthWord "\v0[xX][0-9a-fA-F]*[G-Zg-z_\-?+*~!\@\$%\^&=/\|<>'][0-9a-zA-Z_\-?+*~!\@\$%\^&=/\|<>']*"
 syntax match mirthType "\v[A-Z][0-9a-zA-Z_\-?+*~!\@\$%\^&=/\|<>']*"
-syntax match mirthTag "\v\+[A-Z][0-9a-zA-Z_\-?+*~!\@\$%\^&=/\|<>']*"
+syntax match mirthTag "\v[\?!\+][A-Z][0-9a-zA-Z_\-?+*~!\@\$%\^&=/\|<>']*"
 
 " operators
 syntax match mirthColon "\v:"
@@ -70,4 +70,3 @@ highlight def link mirthString String
 highlight def link mirthNumber Number
 
 let b:current_syntax = "mirth"
-

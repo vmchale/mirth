@@ -1,0 +1,32 @@
+module(tests/error-missing-patterns)
+import(prelude)
+
+data T
+    A
+    B
+    C
+end
+
+f : T --
+f = match(A ->, B ->, C ->)
+
+g : T --
+g = match(A ->, B ->)
+
+h : T --
+h = match(A ->, _ -> drop)
+
+i : T --
+i = match()
+
+data M(t)
+    N
+end
+
+q : M(Int) --
+q = match()
+
+# mirth-test # merr # 14:5: error: Pattern match not exhaustive.
+# mirth-test # merr # 20:5: error: Pattern match not exhaustive.
+# mirth-test # merr # 27:5: error: Pattern match not exhaustive.
+# mirth-test # mret # 1

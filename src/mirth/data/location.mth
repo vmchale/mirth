@@ -1,31 +1,31 @@
 module(mirth/data/location)
 import(mirth/data/module)
 
-def(|Row|, Size, 2)
-def(Row->U16, Row -- U16, cast)
-def(Row->Int, Row -- Int, Row->U16 U16->Int)
-def(U16->Row, U16 -- Row, cast)
-def(Int->Row, Int -- Row, Int->U16 U16->Row)
+Int->Row : Int -- Row
+Int->Row = ROW
 
-def(|Col|, Size, 2)
-def(Col->U16, Col -- U16, cast)
-def(Col->Int, Col -- Int, Col->U16 U16->Int)
-def(U16->Col, U16 -- Col, cast)
-def(Int->Col, Int -- Col, Int->U16 U16->Col)
+Row->Int : Row -- Int
+Row->Int = match(ROW -> id)
 
-def(location-trace!, Module Row Col -- +IO,
+Int->Col : Int -- Col
+Int->Col = COL
+
+Col->Int : Col -- Int
+Col->Int = match(COL -> id)
+
+location-pack : Module Row Col -- Location
+location-pack = LOCATION
+
+location-unpack : Location -- Module Row Col
+location-unpack = match(LOCATION -> id)
+
+location-trace! : Location -- +IO
+location-trace! = (
+    location-unpack
     rotr swap
-    load-module-source-path! str-buf-trace!
+    module-source-path Path->Str str-trace!
     ":" str-trace!
     Row->Int int-trace!
     ":" str-trace!
-    Col->Int int-trace!)
-
-def(location-print!, Module Row Col -- +IO,
-    rotr swap
-    load-module-source-path! str-buf-print!
-    ":" str-print!
-    Row->Int int-print!
-    ":" str-print!
-    Col->Int int-print!)
-
+    Col->Int int-trace!
+)
