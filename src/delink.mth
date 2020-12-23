@@ -1,6 +1,7 @@
 module(delink)
 
 import(prelude)
+import(platform.posix)
 import(delink/parse)
 
 def-type(FILE*, Ptr)
