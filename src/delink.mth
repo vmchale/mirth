@@ -10,12 +10,10 @@ def-external(remove, Str -- Int +File)
 def-external(fread, Ptr Size Size File -- Size +File)
 def-external(fwrite, Ptr Size Size File -- Size +File)
 
-def-external(memcpy, Ptr Ptr Size -- Size +Mem)
-
 buffer(FILE_BUFFER, 32768) # 32kB
 
 def(null-ptr, -- Ptr,
-    0 cast)
+    nil)
 
 def(realpath!, Str -- Str +File +Mem,
    null-ptr realpath
