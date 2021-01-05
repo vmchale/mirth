@@ -1,6 +1,7 @@
 module(delink)
 
 import(prelude)
+import(platform.posix)
 import(delink/parse)
 
 def-external(realpath, Str Ptr -- Str +File +Mem)
@@ -35,7 +36,7 @@ def(delink!, Str -- +IO,
 
 def (delink-main, +IO,
     1 argc < if(
-        1 argv ptr@@ delink!, # cargo culted from mirth compiler
+        1 argv ptr@@ Ptr->Str delink!, # cargo culted from mirth compiler
         "delink takes a filename on the command-line" panic!))
 
 target-c99("delink.c", delink-main)
