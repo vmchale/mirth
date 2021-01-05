@@ -1,7 +1,5 @@
-module(mirth/data/arrow)
-import(mirth/data/common)
-import(mirth/data/word)
-import(mirth/data/prim)
+module(mirth.data.arrow)
+import(mirth.data.type)
 
 ##########
 # ARROWS #
@@ -25,274 +23,338 @@ import(mirth/data/prim)
 # Originally this type was called Morphism but that's hard to spell and
 # to type repeatedly so now it's called Arrow :-)
 
-ARROW_NIL : Arrow
-ARROW_NIL = 0 cast
 
-arrow-is-nil? : Arrow -- Arrow Bool
-arrow-is-nil? = dup ARROW_NIL ==
+# mirth/data/arrow
+table(Atom)
+table(Arrow)
+table(Lambda)
+table(Block)
 
-arrow-alloc! : Arrow
-arrow-alloc! = Arrow.alloc!
+data Arg
+    ARG_BLOCK -> Block
+    ARG_VAR_RUN -> Var
+end
+data Op
+    OP_NONE
+    OP_PRIM -> Prim
+    OP_WORD -> Word
+    OP_EXTERNAL -> External
+    OP_BUFFER -> Buffer
+    OP_INT -> Int
+    OP_STR -> Str
+    OP_TAG -> Tag
+    OP_MATCH -> Match
+    OP_LAMBDA -> Lambda
+    OP_VAR -> Var
+    OP_BLOCK -> Block
+end
+data(Param, PARAM -> Var)
+def(unPARAM, Param -- Var, match(PARAM -> id))
+def(Var->Param, Var -- Param, PARAM)
+def(Param->Var, Param -- Var, match(PARAM -> id))
 
-OP_NONE : Op
-OP_PRIM : Op
-OP_WORD : Op
-OP_EXTERNAL : Op
-OP_BUFFER : Op
-OP_INT : Op
-OP_STR : Op
-OP_TAG : Op
+field(arrow-token-start, Arrow, Token)
+field(arrow-token-end, Arrow, Token)
+field(arrow-ctx, Arrow, Ctx)
+field(arrow-dom, Arrow, Type)
+field(arrow-cod, Arrow, Type)
+field(arrow-atoms, Arrow, List(Atom))
 
-OP_NONE = 0 cast
-OP_PRIM = 1 cast
-OP_WORD = 2 cast
-OP_EXTERNAL = 3 cast
-OP_BUFFER = 4 cast
-OP_INT = 5 cast
-OP_STR = 6 cast
-OP_TAG = 7 cast
+field(atom-token, Atom, Token)
+field(atom-ctx, Atom, Ctx)
+field(atom-op, Atom, Op)
+field(atom-args, Atom, List(Arg))
+field(atom-dom, Atom, Type)
+field(atom-cod, Atom, Type)
+field(atom-subst, Atom, Subst)
 
-arrow-op=? : Arrow Op -- Arrow Bool
-arrow-op=? = dip(arrow-op?) ==
+field(lambda-token, Lambda, Token)
+field(lambda-outer-ctx, Lambda, Ctx)
+field(lambda-inner-ctx, Lambda, Ctx)
+field(lambda-dom, Lambda, Type)
+field(lambda-mid, Lambda, Type)
+field(lambda-cod, Lambda, Type)
+field(lambda-params, Lambda, List(Param))
+field(lambda-body, Lambda, Arrow)
 
-arrow-op-prim! : Prim Arrow --
-arrow-op-prim! = (
-    OP_PRIM over arrow-op!
-    dip(Prim->Int) arrow-op-value!
-)
-
-arrow-op-prim@ : Arrow -- Prim
-arrow-op-prim@ =
-    OP_PRIM arrow-op=? if(
-        arrow-op-value@ Int->Prim,
-        "compiler error: attempted to get prim associated with non-prim arrow" panic!
-    )
-
-arrow-op-prim? : Arrow -- Arrow Prim
-arrow-op-prim? = dup arrow-op-prim@
-
-arrow-op-word! : Word Arrow --
-arrow-op-word! = (
-    OP_WORD over arrow-op!
-    dip(Word->Int) arrow-op-value!
-)
-
-arrow-op-word@ : Arrow -- Word
-arrow-op-word@ =
-    OP_WORD arrow-op=? if(
-        arrow-op-value@ Int->Word,
-        "compiler error: attempted to get word associated with non-word arrow" panic!
-    )
-
-arrow-op-word? : Arrow -- Arrow Word
-arrow-op-word? = dup arrow-op-word@
-
-arrow-op-tag! :  Tag Arrow --
-arrow-op-tag! = (
-    OP_TAG over arrow-op!
-    dip(cast) arrow-op-value!
-)
-
-arrow-op-tag@ : Arrow -- Tag
-arrow-op-tag@ =
-    OP_TAG arrow-op=? if(
-        arrow-op-value@ cast,
-        "compiler error: attempted to get tag associated with non-tag arrow" panic!
-    )
-
-arrow-op-external! : External Arrow --
-arrow-op-external! = (
-    OP_EXTERNAL over arrow-op!
-    dip(External->Int) arrow-op-value!
-)
-
-arrow-op-external@ : Arrow -- External
-arrow-op-external@ =
-    OP_EXTERNAL arrow-op=? if(
-        arrow-op-value@ Int->External,
-        "compiler error: attempted to get external associated with non-external arrow" panic!
-    )
-
-arrow-op-external? : Arrow -- Arrow External
-arrow-op-external? = dup arrow-op-external@
-
-arrow-op-buffer! : Buffer Arrow --
-arrow-op-buffer! = (
-    OP_BUFFER over arrow-op!
-    dip(Buffer->Int) arrow-op-value!
-)
-
-arrow-op-buffer@ : Arrow -- Buffer
-arrow-op-buffer@ =
-    OP_BUFFER arrow-op=? if(
-        arrow-op-value@ Int->Buffer,
-        "compiler error: attempted to get external associated with non-external arrow" panic!
-    )
-
-arrow-op-buffer? : Arrow -- Arrow Buffer
-arrow-op-buffer? = dup arrow-op-buffer@
-
-arrow-op-int! : Int Arrow --
-arrow-op-int! = (
-    OP_INT over arrow-op!
-    arrow-op-value!
-)
-
-arrow-op-int@ : Arrow -- Int
-arrow-op-int@ =
-    OP_INT arrow-op=? if(
-        arrow-op-value@,
-        "compiler error: attempted to get int associated with non-int arrow" panic!
-    )
-
-arrow-op-int? : Arrow -- Arrow Int
-arrow-op-int? = dup arrow-op-int@
-
-arrow-op-str! : StrLit Arrow --
-arrow-op-str! = (
-    OP_STR over arrow-op!
-    dip(StrLit->Int) arrow-op-value!
-)
-
-arrow-op-str@ : Arrow -- StrLit
-arrow-op-str@ =
-    OP_STR arrow-op=? if(
-        arrow-op-value@ Int->StrLit,
-        "compiler error: attempted to get str associated with non-str arrow" panic!
-    )
-
-arrow-op-str? : Arrow -- Arrow StrLit
-arrow-op-str? = dup arrow-op-str@
+field(block-deferred, Block, Bool)
+field(block-forcing, Block, Bool)
+field(block-ctx, Block, Ctx)
+field(block-token, Block, Token)
+field(block-arrow-raw, Block, Arrow)
+field(block-needed, Block, Bool)
 
 #######
 # ARG #
 #######
 
-Arrow->Arg : Arrow -- Arg
-Arrow->Arg = Arg.wrap
+||| Add arg to atom.
+atom-arg-add! : Atom Arg -- Atom
+atom-arg-add! = dip(atom-args?) snoc over atom-args!
 
-Arg->Arrow : Arg -- Arrow
-Arg->Arrow = Arg.unwrap
-
-########
-# ARGS #
-########
-
-Int->Args : Int -- Args
-Int->Args = cast
-
-Args->Int : Args -- Int
-Args->Int = cast
-
-args@ : Ptr -- Args
-args@ = @ Int->Args
-
-args! : Args Ptr --
-args! = dip(Args->Int) !
-
-args-alloc! : Args
-args-alloc! = Args.alloc!
-
-ARGS_NIL : Args
-ARGS_NIL = 0 Int->Args
-
-args-is-nil : Args -- Bool
-args-is-nil = ARGS_NIL ==
-
-args-is-nil? : Args -- Args Bool
-args-is-nil? = dup args-is-nil
-
-args-len : Args -- Int
-args-len = 0 swap while(args-is-nil? not, dip(1+) args-tail@) drop
-
-arrow-args-last& : Arrow -- Ptr
-arrow-args-last& =
-    arrow-args& while(
-        dup args@ args-is-nil not,
-        args@ args-tail&
+||| Add arg to last atom of arrow.
+||| Will panic if arrow has no atoms.
+arrow-arg-add! : Arrow Arg -- Arrow
+arrow-arg-add! =
+    over arrow-atoms@ last match(
+        NONE -> "arrow-arg-add! on empty arrow" panic!,
+        SOME -> swap atom-arg-add! drop
     )
 
-arrow-arg-add! : Arrow Arg -- Arrow
-arrow-arg-add! = (
-    args-alloc!
-    tuck args-head!
-    over arrow-args-last& args!
+||| Add atom to arrow.
+arrow-atom-add! : Arrow Atom -- Arrow
+arrow-atom-add! = dip(arrow-atoms?) snoc over arrow-atoms!
+
+#########
+# BLOCK #
+#########
+
+block-new! : Arrow -- Block
+block-new! = (
+    Block.alloc!
+    over arrow-ctx@ over block-ctx!
+    over arrow-token-start@ over block-token!
+    tuck block-arrow-raw!
 )
 
-arrow-args-0 : Arrow --
-arrow-args-0 =
-    arrow-args? args-len 0 == if(
-        drop,
-        arrow-token@ "compiler error: expected no args in arrow"
-        emit-fatal-error!
+block-new-deferred! : Ctx Token -- Block
+block-new-deferred! = (
+    Block.alloc!
+    true over block-deferred!
+    tuck block-token!
+    tuck block-ctx!
+)
+
+block-arrow@ : Block -- Arrow
+block-arrow@ = (
+    dup block-force!
+    block-arrow-raw@
+)
+
+block-arrow? : Block -- Block Arrow
+block-arrow? = dup block-arrow@
+
+block-force! : Block --
+block-force! =
+    block-deferred? if(
+        block-forcing? if(
+            block-token@
+            "Recursive type detected for block."
+            emit-fatal-error!,
+
+            true over block-forcing!
+
+            block-ctx? over block-token@
+            dip(meta-alloc! TMeta)
+            ab-build!(elab-atoms!)
+            over block-arrow-raw!
+            false swap block-deferred!
+        ),
+        drop
     )
 
-arrow-args-1 : Arrow -- Arg
-arrow-args-1 =
-    arrow-args? args-len 1 == if(
-        arrow-args@ args-head@,
-        arrow-token@ "compiler error: expected 1 arg in arrow"
-        emit-fatal-error!
+block-unify-type! : Gamma Block Type -- Gamma Type
+block-unify-type! =
+    swap block-deferred? if(
+        block-forcing? if(
+            block-token@
+            "Recursive type detected for block."
+            emit-fatal-error!,
+
+            block-unify-type-aux!
+        ),
+        block-arrow-raw@ arrow-type swap type-unify!
     )
 
-arrow-args-2 : Arrow -- Arg Arg
-arrow-args-2 =
-    arrow-args? args-len 2 == if(
-        arrow-args@ args-head? swap
-        args-tail@ args-head@,
-        arrow-token@ "compiler error: expected 2 args in arrow"
-        emit-fatal-error!
+block-unify-type-aux! : Gamma Type Block -- Gamma Type
+block-unify-type-aux! = (
+    true over block-forcing!
+    dip(over gamma-token@ elab-expand-morphism! drop)
+    rotr dip(
+        dip(block-ctx? over block-token@) swap
+        ab-build!(elab-atoms!)
+
+        dup2 swap block-arrow-raw!
+        dip(false swap block-deferred!)
+        arrow-cod@
     )
+    type-unify!
+)
+
+# block-force-type! : Block Type --
+#     block-deferred? if(
+#         drop,
+#     )
+
+#     dip(block-token@)
+
+#     ab-build!(elab-atoms!)
 
 ####################################
 # Helpers for constructing arrows. #
 ####################################
 # TODO: Use an effect, or something, to elaborate these with types.
 
+atom-new-lambda! : Lambda -- Atom
+atom-new-lambda! = OP_LAMBDA Atom.alloc! tuck atom-op!
+
+atom-new-int! : Int -- Atom
+atom-new-int! = OP_INT Atom.alloc! tuck atom-op!
+
+atom-new-buffer! : Buffer -- Atom
+atom-new-buffer! = OP_BUFFER Atom.alloc! tuck atom-op!
+
+atom-new-external! : External -- Atom
+atom-new-external! = OP_EXTERNAL Atom.alloc! tuck atom-op!
+
+atom-new-prim! : Prim -- Atom
+atom-new-prim! = OP_PRIM Atom.alloc! tuck atom-op!
+
+atom-new-word! : Word -- Atom
+atom-new-word! = OP_WORD Atom.alloc! tuck atom-op!
+
+arrow-new-lambda! : Lambda -- Arrow
+arrow-new-lambda! = Arrow.alloc! swap arrow-push-lambda!
+
 arrow-new-int! : Int -- Arrow
-arrow-new-int! = (
-    arrow-alloc!
-    tuck arrow-op-int!
-)
+arrow-new-int! = Arrow.alloc! swap arrow-push-int!
 
 arrow-new-buffer! : Buffer -- Arrow
-arrow-new-buffer! = (
-    arrow-alloc!
-    tuck arrow-op-buffer!
-)
+arrow-new-buffer! = Arrow.alloc! swap arrow-push-buffer!
 
 arrow-new-external! : External -- Arrow
-arrow-new-external! = (
-    arrow-alloc!
-    tuck arrow-op-external!
-)
+arrow-new-external! = Arrow.alloc! swap arrow-push-external!
 
 arrow-new-prim! : Prim -- Arrow
-arrow-new-prim! = (
-    arrow-alloc!
-    tuck arrow-op-prim!
-)
+arrow-new-prim! = Arrow.alloc! swap arrow-push-prim!
 
 arrow-new-word! : Word -- Arrow
-arrow-new-word! = (
-    arrow-alloc!
-    tuck arrow-op-word!
-)
+arrow-new-word! = Arrow.alloc! swap arrow-push-word!
 
-arrow-push! : Arrow Arrow -- Arrow
-arrow-push! = dup dip(swap arrow-next!)
+arrow-push-lambda! : Arrow Lambda -- Arrow
+arrow-push-lambda! = atom-new-lambda! arrow-atom-add!
 
 arrow-push-int! : Arrow Int -- Arrow
-arrow-push-int! = arrow-new-int! arrow-push!
+arrow-push-int! = atom-new-int! arrow-atom-add!
 
 arrow-push-buffer! : Arrow Buffer -- Arrow
-arrow-push-buffer! = arrow-new-buffer! arrow-push!
+arrow-push-buffer! = atom-new-buffer! arrow-atom-add!
 
 arrow-push-external! : Arrow External -- Arrow
-arrow-push-external! = arrow-new-external! arrow-push!
+arrow-push-external! = atom-new-external! arrow-atom-add!
 
 arrow-push-prim! : Arrow Prim -- Arrow
-arrow-push-prim! = arrow-new-prim! arrow-push!
+arrow-push-prim! = atom-new-prim! arrow-atom-add!
 
 arrow-push-word! : Arrow Word -- Arrow
-arrow-push-word! = arrow-new-word! arrow-push!
+arrow-push-word! = atom-new-word! arrow-atom-add!
+
+
+#########
+# MATCH #
+#########
+
+# mirth/data/type
+table(Match)
+table(Case)
+data Pattern
+    PATTERN_UNDERSCORE
+    PATTERN_TAG -> Tag
+end
+
+field(match-ctx, Match, Ctx)
+field(match-dom, Match, Type)
+field(match-cod, Match, Type)
+field(match-token, Match, Token)
+field(match-cases, Match, List(Case))
+field(case-match, Case, Match)
+field(case-token, Case, Token)
+field(case-pattern, Case, Pattern)
+field(case-subst, Case, Subst)
+field(case-mid, Case, Type)
+field(case-body, Case, Arrow)
+
+match-is-empty? : Match -- Match Bool
+match-is-empty? = match-cases? is-nil
+
+match-num-cases? : Match -- Match Int
+match-num-cases? = match-cases? len
+
+match-add-case! : Match Case -- Match
+match-add-case! =
+    dip(match-cases?) cases-cover-case? if(
+        case-token@ "Case is unreachable." emit-error! drop,
+        snoc over match-cases!
+    )
+
+match-has-default-case : Match -- Bool
+match-has-default-case = match-cases@ cases-have-default-case
+
+match-has-default-case? : Match -- Match Bool
+match-has-default-case? = dup match-has-default-case
+
+||| Get type we're matching over.
+match-scrutinee-type? : Match -- Match Maybe(Type)
+match-scrutinee-type? =
+    match-dom? type-expand match(
+        TTensor -> nip SOME,
+        _ -> drop NONE
+    )
+
+||| Get "data" associated with scrutinee.
+match-scrutinee-data? : Match -- Match Maybe(Data)
+match-scrutinee-data? =
+    match-scrutinee-type? maybe-bind(
+        type-head match(
+            TData -> SOME,
+            _ -> drop NONE
+        )
+    )
+
+match-is-transparent? : Match -- Match Bool
+match-is-transparent? =
+    match-scrutinee-data? match(
+        SOME -> data-is-transparent? nip,
+        NONE -> false
+    )
+
+########
+# CASE #
+########
+
+cases-cover-case? : List(Case) Case -- List(Case) Case Bool
+cases-cover-case? = dup2 cases-cover-case
+
+cases-cover-case : List(Case) Case -- Bool
+cases-cover-case = swap any(case-is-covered?) nip
+
+case-is-covered? : Case Case -- Case Case Bool
+case-is-covered? = dup2 case-is-covered
+
+||| Ask whether the second case covers the first case already.
+case-is-covered : Case Case -- Bool
+case-is-covered = dip(case-pattern@) case-pattern@ pattern-is-covered
+
+cases-have-default-case : List(Case) -- Bool
+cases-have-default-case = any(case-is-default-case?)
+
+case-is-default-case? : Case -- Case Bool
+case-is-default-case? = dup case-is-default-case
+
+case-is-default-case : Case -- Bool
+case-is-default-case = case-pattern@ PATTERN_UNDERSCORE ==
+
+###########
+# PATTERN #
+###########
+
+||| Asks whether the second pattern already covers the case of the first pattern.
+pattern-is-covered : Pattern Pattern -- Bool
+pattern-is-covered =
+    match(
+        PATTERN_UNDERSCORE -> drop true,
+        _ -> ==
+    )
+
+int-false-prime : Int -- Int Bool
+int-false-prime = dup 2 == or(dup 2 % 1 ==)

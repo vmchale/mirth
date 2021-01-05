@@ -1,15 +1,80 @@
 
-module(mirth/data/type)
-import(mirth/data/common)
-import(mirth/data/name)
-import(mirth/data/ctx)
-import(mirth/data/var)
+module(mirth.data.type)
+import(mirth.data.name)
+import(data.map)
+
+# mirth/data/type
+data Type
+    TYPE_ERROR
+    TYPE_DONT_CARE
+    TPrim -> PrimType
+    TMeta -> MetaVar
+    THole -> Name
+    TVar -> Var
+    TTable -> Table
+    TData -> Data
+    TTensor -> Type Type
+    TMorphism -> Type Type
+    TApp -> Type Type
+    TValue -> Value
+end
+
+data Value
+    VALUE_INT -> Int
+    VALUE_STR -> Str
+    VALUE_BLOCK -> Block
+end
+
+data PrimType
+    PRIM_TYPE_UNIT
+    PRIM_TYPE_TYPE
+    PRIM_TYPE_STACK
+    PRIM_TYPE_EFFECT
+    PRIM_TYPE_INT
+    PRIM_TYPE_PTR
+    PRIM_TYPE_STR
+    PRIM_TYPE_CHAR
+    PRIM_TYPE_BOOL
+    PRIM_TYPE_U64
+    PRIM_TYPE_U32
+    PRIM_TYPE_U16
+    PRIM_TYPE_U8
+    PRIM_TYPE_I64
+    PRIM_TYPE_I32
+    PRIM_TYPE_I16
+    PRIM_TYPE_I8
+end
+
+table(MetaVar)
+table(Data)
+table(Tag)
+data(Ctx, CTX -> List(Var))
+
+field(meta-is-defined, MetaVar, Bool)
+field(meta-type-raw, MetaVar, Type)
+
+field(data-header, Data, Token)
+field(data-name, Data, Name)
+field(data-arity, Data, Int)
+field(data-tags, Data, List(Tag))
+
+field(tag-data, Tag, Data)
+field(tag-name, Tag, Name)
+field(tag-value, Tag, Int)
+field(tag-sig, Tag, Token)
+field(tag-has-sig, Tag, Bool)
+field(tag-sig-is-checked, Tag, Bool)
+field(tag-ctx, Tag, Ctx)
+field(tag-type-raw, Tag, Type)
+
 
 def(def-type!, Type Str --, name-new! name-type!)
 
 def(init-types!, --,
     TYPE_INT "Int" def-type!
     TYPE_PTR "Ptr" def-type!
+    TYPE_STR "Str" def-type!
+    TYPE_CHAR "Char" def-type!
     TYPE_U8 "U8" def-type!
     TYPE_U16 "U16" def-type!
     TYPE_U32 "U32" def-type!
@@ -24,97 +89,8 @@ def(init-types!, --,
 # Types #
 #########
 
-def(Type->U32, Type -- U32, cast)
-def(U32->Type, U32 -- Type, cast)
-def(Type->Int, Type -- Int, Type->U32 U32->Int)
-def(Int->Type, Int -- Type, Int->U32 U32->Type)
-def(|Type|, Size, 4)
-def(type@, Ptr -- Type, u32@ U32->Type)
-def(type!, Type Ptr --, dip(Type->U32) u32!)
-def(type@@, Int Ptr -- Type, dip(|Type| *) ptr+ type@)
-def(type!!, Type Int Ptr --, dip(|Type| *) ptr+ type!)
-
-def(NameValue->Type, NameValue -- Type, NameValue->Int Int->Type)
-def(Type->NameValue, Type -- NameValue, Type->Int Int->NameValue)
-def(name-type!, Type Name --,
-    DEF_TYPE over name-sort!
-    dip(Type->NameValue) name-value!)
-def(name-type@, Name -- Type,
-    name-is-type? if(
-        name-value@ NameValue->Type,
-        "compiler error: attempted to get type definition for non-type name" panic!
-    ))
-def(name-is-table?, Name -- Name Bool,
-    name-is-type? if(
-        dup name-type@ type-is-table,
-        false
-    ))
-
-def(TYPE_TAG_MASK,     Int, 0xF0000000)
-def(TYPE_VALUE_MASK,   Int, 0x0FFFFFFF)
-def(TYPE_TAG_PRIM,     Int, 0x00000000)
-def(TYPE_TAG_VAR,      Int, 0x10000000)
-def(TYPE_TAG_META,     Int, 0x20000000)
-def(TYPE_TAG_TENSOR,   Int, 0x30000000)
-def(TYPE_TAG_MORPHISM, Int, 0x40000000)
-def(TYPE_TAG_NOMINAL,  Int, 0x50000000)
-def(TYPE_TAG_TABLE,    Int, 0x60000000)
-def(TYPE_TAG_HOLE,     Int, 0x70000000)
-def(TYPE_TAG_PARAM,    Int, 0x80000000)
-def(TYPE_TAG_APP,      Int, 0x90000000)
-def(TYPE_TAG_DATA,     Int, 0xA0000000)
-
-def(ctx-trace!, Ctx -- +IO,
-    ctx-is-empty? if(
-        drop,
-
-        dup ctx-prev@
-        ctx-is-empty? if(
-            drop,
-            ctx-trace! ", " str-trace!
-        )
-
-        ctx-var@ var-trace-binding!
-    ))
-
-def(var-trace-binding!, Var -- +IO,
-    var-name? name-load! str-buf-trace!
-    var-type? TYPE_TYPE == if(
-        drop,
-    var-type? TYPE_STACK == if(
-        drop,
-    var-type? TYPE_EFFECT == if(
-        drop,
-        " : " str-trace!
-        var-type@ type-trace-sig!
-    ))))
-
-def(TPrim, Int -- Type,
-    Int->Type)
-def(TVar, Var -- Type,
-    Var->Int TYPE_TAG_VAR | Int->Type) # dangerous...
-def(TMeta, MetaVar -- Type,
-    MetaVar->Int TYPE_TAG_META | Int->Type)
-def(TTensor, TensorType -- Type,
-    TensorType->Int TYPE_TAG_TENSOR | Int->Type)
-def(TMorphism, MorphismType -- Type,
-    MorphismType->Int TYPE_TAG_MORPHISM | Int->Type)
-def(TNominal, Nominal -- Type,
-    Nominal->Int TYPE_TAG_NOMINAL | Int->Type)
-def(TTable, Table -- Type,
-    Table->Int TYPE_TAG_TABLE | Int->Type)
-def(THole, Name -- Type,
-    Name->Int TYPE_TAG_HOLE | Int->Type)
-def(TParam, ParamType -- Type,
-    ParamType->Int TYPE_TAG_PARAM | Int->Type)
-def(TApp, AppType -- Type,
-    AppType->Int TYPE_TAG_APP | Int->Type)
-def(TData, Data -- Type,
-    Data->Int TYPE_TAG_DATA | Int->Type)
-
-def(T*, Type Type -- Type, tensor-type-new! TTensor)
-def(T->, Type Type -- Type, morphism-type-new! TMorphism)
-def(T=>, Param Type -- Type, param-type-new! TParam)
+def(T*, Type Type -- Type, TTensor)
+def(T->, Type Type -- Type, TMorphism)
 
 def(T0, Type, TYPE_UNIT)
 def(T1, Type -- Type, dip(T0) T*)
@@ -124,156 +100,68 @@ def(T4, Type Type Type Type -- Type, dip(T3) T*)
 def(T5, Type Type Type Type Type -- Type, dip(T4) T*)
 def(T6, Type Type Type Type Type Type -- Type, dip(T5) T*)
 
-def(type-tag, Type -- Int, Type->Int TYPE_TAG_MASK &)
-def(type-is-prim, Type -- Bool, type-tag TYPE_TAG_PRIM ==)
-def(type-is-var, Type -- Bool, type-tag TYPE_TAG_VAR ==)
-def(type-is-meta, Type -- Bool, type-tag TYPE_TAG_META ==)
-def(type-is-tensor, Type -- Bool, type-tag TYPE_TAG_TENSOR ==)
-def(type-is-morphism, Type -- Bool, type-tag TYPE_TAG_MORPHISM ==)
-def(type-is-nominal, Type -- Bool, type-tag TYPE_TAG_NOMINAL ==)
-def(type-is-table, Type -- Bool, type-tag TYPE_TAG_TABLE ==)
-def(type-is-hole, Type -- Bool, type-tag TYPE_TAG_HOLE ==)
-def(type-is-param, Type -- Bool, type-tag TYPE_TAG_PARAM ==)
-def(type-is-app, Type -- Bool, type-tag TYPE_TAG_APP ==)
-def(type-is-data, Type -- Bool, type-tag TYPE_TAG_DATA ==)
+# def(type-is-error, Type -- Bool, match(TYPE_ERROR -> true, _ -> drop false))
+# def(type-is-dont-care, Type -- Bool, match(TYPE_DONT_CARE -> true, _ -> drop false))
+# def(type-is-prim, Type -- Bool, match(TPrim -> drop true, _ -> drop false))
+# def(type-is-var, Type -- Bool, match(TVar -> drop true, _ -> drop false))
+# def(type-is-meta, Type -- Bool, match(TMeta -> drop true, _ -> drop false))
+# def(type-is-tensor, Type -- Bool, match(TTensor -> drop2 true, _ -> drop false))
+def(type-is-morphism, Type -- Bool, match(TMorphism -> drop2 true, _ -> drop false))
+# def(type-is-table, Type -- Bool, match(TTable -> drop true, _ -> drop false))
+# def(type-is-hole, Type -- Bool, match(THole -> drop true, _ -> drop false))
+# def(type-is-app, Type -- Bool, match(TApp -> drop2 true, _ -> drop false))
+# def(type-is-data, Type -- Bool, match(TData -> drop true, _ -> drop false))
 
-def(type-is-prim?, Type -- Type Bool, dup type-is-prim)
-def(type-is-var?, Type -- Type Bool, dup type-is-var)
-def(type-is-meta?, Type -- Type Bool, dup type-is-meta)
-def(type-is-tensor?, Type -- Type Bool, dup type-is-tensor)
+# def(type-is-error?, Type -- Type Bool, dup type-is-error)
+# def(type-is-dont-care?, Type -- Type Bool, dup type-is-dont-care)
+# def(type-is-prim?, Type -- Type Bool, dup type-is-prim)
+# def(type-is-var?, Type -- Type Bool, dup type-is-var)
+# def(type-is-meta?, Type -- Type Bool, dup type-is-meta)
+# def(type-is-tensor?, Type -- Type Bool, dup type-is-tensor)
 def(type-is-morphism?, Type -- Type Bool, dup type-is-morphism)
-def(type-is-nominal?, Type -- Type Bool, dup type-is-nominal)
-def(type-is-table?, Type -- Type Bool, dup type-is-table)
-def(type-is-hole?, Type -- Type Bool, dup type-is-hole)
-def(type-is-param?, Type -- Type Bool, dup type-is-param)
-def(type-is-app?, Type -- Type Bool, dup type-is-app)
-def(type-is-data?, Type -- Type Bool, dup type-is-data)
+# def(type-is-table?, Type -- Type Bool, dup type-is-table)
+# def(type-is-hole?, Type -- Type Bool, dup type-is-hole)
+# def(type-is-app?, Type -- Type Bool, dup type-is-app)
+# def(type-is-data?, Type -- Type Bool, dup type-is-data)
 
-def(type-is-stack-var, Type -- Bool,
-    type-is-var? if(
-        type-get-var var-name@ name-could-be-stack-var,
-        drop false
-    ))
-def(type-is-stack-var?, Type -- Type Bool, dup type-is-stack-var)
-
-def(type-get-value, Type -- Int, Type->Int TYPE_VALUE_MASK &)
-def(type-get-var, Type -- Var,
-    type-is-var? not if(
-        "compiler error: tried to get var value on non-var type" panic!,
-        type-get-value Int->Var
-    ))
-def(type-get-meta, Type -- MetaVar,
-    type-is-meta? not if(
-        "compiler error: tried to get meta value on non-meta type" panic!,
-        type-get-value Int->MetaVar
-    ))
-def(type-get-tensor, Type -- TensorType,
-    type-is-tensor? not if(
-        "compiler error: tried to get tensor value on non-tensor type" panic!,
-        type-get-value Int->TensorType
-    ))
-def(type-get-morphism, Type -- MorphismType,
-    type-is-morphism? not if(
-        "compiler error: tried to get morphism value on non-morphism type" panic!,
-        type-get-value Int->MorphismType
-    ))
-def(type-get-nominal, Type -- Nominal,
-    type-is-nominal? not if(
-        "compiler error: tried to get nominal value on non-nominal type" panic!,
-        type-get-value Int->Nominal
-    ))
-def(type-get-table, Type -- Table,
-    type-is-table? not if(
-        "compiler error: tried to get table value on non-table type" panic!,
-        type-get-value Int->Table
-    ))
-def(type-get-hole-name, Type -- Name,
-    type-is-hole? not if(
-        "compiler error: tried to get hole name value on non-hole type" panic!,
-        type-get-value Int->Name
-    ))
-def(type-get-param, Type -- ParamType,
-    type-is-param? not if(
-        "compiler error: tried to get param type value on non-param type" panic!,
-        type-get-value Int->ParamType
-    ))
-def(type-get-app, Type -- AppType,
-    type-is-app? not if(
-        "compiler error: tried to get app type value on non-app type" panic!,
-        type-get-value Int->AppType
-    ))
-def(type-get-data, Type -- Data,
-    type-is-data? not if(
-        "compiler error: tried to get data type value on non-data type" panic!,
-        type-get-value Int->Data
-    ))
-
-def(TYPE_ERROR, Type, 0x00 TPrim)
-def(TYPE_TYPE, Type, 0x01 TPrim) # type of types
-def(TYPE_STACK, Type, 0x02 TPrim) # type of stack types
-def(TYPE_EFFECT, Type, 0x03 TPrim) # type of effect types
-def(TYPE_INT, Type, 0x10 TPrim) # generic integer type for integer literals
-def(TYPE_PTR, Type, 0x11 TPrim) # generic pointer type (e.g. void*)
-def(TYPE_U8, Type, 0x12 TPrim) # fixed width integer type -- unsigned 8 bit
-def(TYPE_U16, Type, 0x13 TPrim) # fixed width integer type -- unsigned 16 bit
-def(TYPE_U32, Type, 0x14 TPrim) # fixed width integer type -- unsigned 32 bit
-def(TYPE_U64, Type, 0x15 TPrim) # fixed width integer type -- unsigned 64 bit
-def(TYPE_I8, Type, 0x16 TPrim) # fixed width integer type -- signed 8 bit
-def(TYPE_I16, Type, 0x17 TPrim) # fixed width integer type -- signed 16 bit
-def(TYPE_I32, Type, 0x18 TPrim) # fixed width integer type -- signed 32 bit
-def(TYPE_I64, Type, 0x19 TPrim) # fixed width integer type -- signed 64 bit
-def(TYPE_UNIT, Type, 0x1A TPrim) # unit type, also used for empty stack
-def(TYPE_BOOL, Type, 0x1B TPrim) # bool type
-def(TYPE_DONT_CARE, Type, 0xFF TPrim) # don't care type, _.
+def(TYPE_TYPE, Type, PRIM_TYPE_TYPE TPrim) # type of types
+def(TYPE_STACK, Type, PRIM_TYPE_STACK TPrim) # type of stack types
+def(TYPE_EFFECT, Type, PRIM_TYPE_EFFECT TPrim) # type of effect types
+def(TYPE_UNIT, Type, PRIM_TYPE_UNIT TPrim) # unit type
+def(TYPE_BOOL, Type, PRIM_TYPE_BOOL TPrim) # bool type
+def(TYPE_INT, Type, PRIM_TYPE_INT TPrim) # generic integer type for integer literals
+def(TYPE_PTR, Type, PRIM_TYPE_PTR TPrim) # generic pointer type (e.g. void*)
+def(TYPE_STR, Type, PRIM_TYPE_STR TPrim) # string pointer (just a pointer but nominally)
+def(TYPE_CHAR, Type, PRIM_TYPE_CHAR TPrim) # char (UTF8-encoded codepoint in U32)
+def(TYPE_U8, Type, PRIM_TYPE_U8 TPrim) # fixed width integer type -- unsigned 8 bit
+def(TYPE_U16, Type, PRIM_TYPE_U16 TPrim) # fixed width integer type -- unsigned 16 bit
+def(TYPE_U32, Type, PRIM_TYPE_U32 TPrim) # fixed width integer type -- unsigned 32 bit
+def(TYPE_U64, Type, PRIM_TYPE_U64 TPrim) # fixed width integer type -- unsigned 64 bit
+def(TYPE_I8, Type, PRIM_TYPE_I8 TPrim) # fixed width integer type -- signed 8 bit
+def(TYPE_I16, Type, PRIM_TYPE_I16 TPrim) # fixed width integer type -- signed 16 bit
+def(TYPE_I32, Type, PRIM_TYPE_I32 TPrim) # fixed width integer type -- signed 32 bit
+def(TYPE_I64, Type, PRIM_TYPE_I64 TPrim) # fixed width integer type -- signed 64 bit
 
 def(type-expand, Type -- Type,
-    type-is-meta? if(
-        type-get-meta meta-expand,
-
-    # TODO: expand app type if this is reasonable
-
-        id
+    match(
+        TMeta -> meta-expand,
+        # TODO: expand/compute app type if this is reasonable
+        _ -> id
     ))
 
-# high level version of type-get-tensor that introduces metavars if needed
-def(type-expand-tensor, Type -- TensorType,
-    type-expand
-    dup TYPE_ERROR == if(
-        drop 0 Int->TensorType,
+data Gamma
+    GAMMA -> Token
+end
 
-    type-is-meta? if( # undefined metavar -- introduce a tensor type
-        meta-alloc! TMeta
-        meta-alloc! TMeta
-        tensor-type-new! TTensor
-        swap type-unify!
-        type-get-tensor,
+gamma-token@ : Gamma -- Token
+gamma-token@ = match(GAMMA -> id)
 
-        type-get-tensor
-    )))
-
-# high level version of type-get-morphism that introduces metavars if needed
-def(type-expand-morphism, Type -- MorphismType,
-    type-expand
-    type-is-meta? if( # undefined metavar -- introduce a morphism type
-        meta-alloc! TMeta
-        meta-alloc! TMeta
-        morphism-type-new! TMorphism
-        swap type-unify!
-        type-get-morphism,
-
-        type-get-morphism
-    ))
-
-buffer(ELAB_TOKEN, 8)
-def(elab-token@, -- Token +Elab, ELAB_TOKEN token@)
-def(elab-token!, Token -- +Elab, ELAB_TOKEN token!)
-def(elab-emit-warning!, Str -- +Elab, dip(elab-token@) emit-warning!)
-def(elab-emit-error!, Str -- +Elab, dip(elab-token@) emit-error!)
-def(elab-emit-fatal-error!, *a Str -- *b +Elab, dip(elab-token@) emit-fatal-error!)
+gamma-token? : Gamma -- Gamma Token
+gamma-token? = dup gamma-token@
 
 # Raise a type unification error.
-def(type-unify-failed!, Type Type -- Type +Elab,
-    elab-token@ token-location location-trace!
+def(type-unify-failed!, Gamma Type Type -- Gamma Type +Elab,
+    dip2(gamma-token? token-location location-trace!)
     ": error: Failed to unify " str-trace!
     dip(type-trace!)
     " with " str-trace!
@@ -283,242 +171,324 @@ def(type-unify-failed!, Type Type -- Type +Elab,
     num-errors++)
 
 # Unify two types. Raises an elaboration error if unification is impossible.
-def(type-unify!, Type Type -- Type +Elab,
-    dip(type-expand) type-expand
+def(type-unify!, Gamma Type Type -- Gamma Type +Elab,
+    swap type-expand match(
+        TYPE_ERROR -> drop TYPE_ERROR,
+        TYPE_DONT_CARE -> id,
+        THole -> type-hole-unify!,
+        TMeta ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TMeta,
+                THole -> dip(TMeta) type-hole-unify!,
+                _ -> swap meta-unify!,
+            ),
+        TVar ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TVar,
+                THole -> dip(TVar) type-hole-unify!,
+                TMeta -> dip(TVar) meta-unify!,
+                TVar -> type-var-unify!,
+                _ -> dip(TVar) type-unify-failed!,
+            ),
+        TPrim ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TPrim,
+                THole -> dip(TPrim) type-hole-unify!,
+                TMeta -> dip(TPrim) meta-unify!,
+                TValue -> dip(TPrim) type-value-unify!,
+                TPrim -> type-prim-unify!,
+                _ -> dip(TPrim) type-unify-failed!,
+            ),
+        TData ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TData,
+                THole -> dip(TData) type-hole-unify!,
+                TMeta -> dip(TData) meta-unify!,
+                TValue -> dip(TData) type-value-unify!,
+                TData -> type-data-unify!,
+                _ -> dip(TData) type-unify-failed!,
+            ),
+        TTable ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TTable,
+                THole -> dip(TTable) type-hole-unify!,
+                TMeta -> dip(TTable) meta-unify!,
+                TValue -> dip(TTable) type-value-unify!,
+                TTable -> type-table-unify!,
+                _ -> dip(TTable) type-unify-failed!,
+            ),
+        TTensor ->
+            rotl type-expand match(
+                TYPE_ERROR -> drop2 TYPE_ERROR,
+                TYPE_DONT_CARE -> TTensor,
+                THole -> dip(TTensor) type-hole-unify!,
+                TMeta -> dip(TTensor) meta-unify!,
+                TValue -> dip(TTensor) type-value-unify!,
+                TTensor -> type-unify-pair! TTensor,
+                _ -> dip(TTensor) type-unify-failed!,
+            ),
+        TMorphism ->
+            rotl type-expand match(
+                TYPE_ERROR -> drop2 TYPE_ERROR,
+                TYPE_DONT_CARE -> TMorphism,
+                THole -> dip(TMorphism) type-hole-unify!,
+                TMeta -> dip(TMorphism) meta-unify!,
+                TValue -> dip(TMorphism) type-value-unify!,
+                TMorphism -> type-unify-pair! TMorphism,
+                _ -> dip(TMorphism) type-unify-failed!,
+            ),
+        TApp ->
+            rotl type-expand match(
+                TYPE_ERROR -> drop2 TYPE_ERROR,
+                TYPE_DONT_CARE -> TApp,
+                THole -> dip(TApp) type-hole-unify!,
+                TMeta -> dip(TApp) meta-unify!,
+                TValue -> dip(TApp) type-value-unify!,
+                TApp -> type-unify-pair! TApp,
+                _ -> dip(TApp) type-unify-failed!,
+            ),
+        TValue ->
+            swap type-expand match(
+                TYPE_ERROR -> drop TYPE_ERROR,
+                TYPE_DONT_CARE -> TValue,
+                THole -> dip(TValue) type-hole-unify!,
+                TMeta -> dip(TValue) meta-unify!, # this might be bad?
+                TValue -> value-unify!,
+                _ -> value-type-unify!
+            ),
+    ))
 
-    dup type-is-hole if(
-        type-get-hole-name
-        type-hole-unify!,
+value-unify! : Gamma Value Value -- Gamma Type
+value-unify! =
+    swap match(
+        VALUE_INT -> swap match(
+            VALUE_INT -> dup2 == if(drop VALUE_INT TValue, drop2 TYPE_INT),
+            VALUE_STR ->
+                drop2 gamma-token?
+                "Can't unify int value with string value."
+                emit-error! TYPE_ERROR,
+            VALUE_BLOCK ->
+                drop2 gamma-token?
+                "Can't unify int value with block."
+                emit-error! TYPE_ERROR,
+        ),
 
-    over type-is-hole if(
-        swap
-        type-get-hole-name
-        type-hole-unify!,
+        VALUE_STR -> swap match(
+            VALUE_STR -> dup2 == if(drop VALUE_STR TValue, drop2 TYPE_STR),
+            VALUE_INT ->
+                drop2 gamma-token?
+                "Can't unify string value with int value."
+                emit-error! TYPE_ERROR,
+            VALUE_BLOCK ->
+                drop2 gamma-token?
+                "Can't unify string value with block."
+                emit-error! TYPE_ERROR,
+        ),
 
-    dup TYPE_DONT_CARE == if(
-        drop,
+        VALUE_BLOCK -> swap match(
+            VALUE_BLOCK ->
+                dup2 == if(
+                    drop VALUE_BLOCK TValue,
+                    block-infer-type!
+                    block-unify-type!
+                ),
+            VALUE_INT ->
+                drop2 gamma-token?
+                "Can't unify block with int value."
+                emit-error! TYPE_ERROR,
+            VALUE_STR ->
+                drop2 gamma-token?
+                "Can't unify block with string value."
+                emit-error! TYPE_ERROR
+        ),
+    )
 
-    over TYPE_DONT_CARE == if(
-        nip,
+type-value-unify! : Gamma Type Value -- Gamma Type,
+type-value-unify! =
+    match(
+        VALUE_INT -> drop TYPE_INT type-unify!,
+        VALUE_STR -> drop TYPE_STR type-unify!,
+        VALUE_BLOCK -> swap block-unify-type!, # technically inaccurate?
+    )
 
+value-type-unify! : Gamma Value Type -- Gamma Type
+value-type-unify! =
+    swap match(
+        VALUE_INT -> drop TYPE_INT swap type-unify!,
+        VALUE_STR -> drop TYPE_STR swap type-unify!,
+        VALUE_BLOCK -> swap block-unify-type!,
+    )
+
+arrow-type : Arrow -- Type
+arrow-type = arrow-dom? swap arrow-cod@ TMorphism
+    # TODO effects
+
+block-infer-type! : Block -- Type
+block-infer-type! = block-arrow@ arrow-type
+
+def(type-unify-pair!, Gamma Type Type Type Type -- Gamma Type Type,
+    dip(swap dip(type-unify! swap)) type-unify! dip(swap))
+
+def(type-prim-unify!, Gamma PrimType PrimType -- Gamma Type,
     dup2 == if(
-        drop, # types are equal
-
-    dup TYPE_ERROR == if(
-        drop2 TYPE_ERROR,
-
-    over TYPE_ERROR == if(
-        drop2 TYPE_ERROR,
-
-    swap type-is-meta? if(
-        type-get-meta meta-unify!,
-
-    swap type-is-meta? if(
-        type-get-meta meta-unify!,
-
-    type-is-prim? if( # other than TYPE_ERROR, primitive types need to be exact matches.
-        type-unify-failed!,
-
-    type-is-var? if( # type variables need to be exact matches.
-        type-unify-failed!,
-
-    type-is-nominal? if( # nominals need to be exact matches
-        type-unify-failed!,
-
-    type-is-data? if( # data types are just like nominal types
-        type-unify-failed!,
-
-    type-is-table? if( # table types need to be exact matches
-        type-unify-failed!,
-
-    type-is-tensor? if(
-        swap
-        type-is-tensor? if(
-            type-get-tensor swap
-            type-get-tensor
-            tensor-type-unify! TTensor,
-
-            type-unify-failed!
-        ),
-
-    type-is-morphism? if(
-        swap
-        type-is-morphism? if(
-            type-get-morphism swap
-            type-get-morphism
-            morphism-type-unify! TMorphism,
-
-            type-unify-failed!
-        ),
-
-    type-is-app? if(
-        swap
-        type-is-app? if(
-            type-get-app swap
-            type-get-app
-            app-type-unify! TApp,
-
-            type-unify-failed!
-        ),
-
-    # TODO: unify param types
-
-        type-unify-failed!
-    ))))))))))))))))))
+        drop TPrim,
+        dip(TPrim) TPrim type-unify-failed!
+    ))
+def(type-data-unify!, Gamma Data Data -- Gamma Type,
+    dup2 == if(
+        drop TData,
+        dip(TData) TData type-unify-failed!
+    ))
+def(type-table-unify!, Gamma Table Table -- Gamma Type,
+    dup2 == if(
+        drop TTable,
+        dip(TTable) TTable type-unify-failed!
+    ))
+def(type-var-unify!, Gamma Var Var -- Gamma Type,
+    dup2 == if(
+        drop TVar,
+        dip(TVar) TVar type-unify-failed!
+    ))
 
 def(type-has-meta?, MetaVar Type -- MetaVar Type Bool,
     dup2 type-has-meta)
 
 def(type-has-meta, MetaVar Type -- Bool,
-    type-is-prim? if(
-        drop2 false,
-
-    type-is-var? if(
-        drop2 false,
-
-    type-is-meta? if(
-        type-get-meta ==,
-
-    type-is-tensor? if(
-        type-get-tensor tensor-type-has-meta,
-
-    type-is-morphism? if(
-        type-get-morphism morphism-type-has-meta,
-
-    type-is-app? if(
-        type-get-app app-type-has-meta,
-
-    type-is-nominal? if(
-        drop2 false,
-
-    type-is-data? if(
-        drop2 false,
-
-    type-is-table? if(
-        drop2 false,
-
-        "type-has-meta: unknown type" panic!
-    ))))))))))
-
-def(type-trace-sig!, Type -- +IO,
-    dup TYPE_ERROR == if(
-        "<ERROR>" str-trace! drop,
-
-        type-get-morphism dup
-        morphism-type-dom@
-        dup TYPE_UNIT == if(
-            drop,
-            type-trace-stack!
-            " " str-trace!
-        )
-        "--" str-trace!
-        morphism-type-cod@
-        dup TYPE_UNIT == if(
-            drop,
-            " " str-trace!
-            type-trace-stack!
+    type-expand match(
+        TYPE_ERROR -> drop false,
+        TYPE_DONT_CARE -> drop false,
+        TPrim -> drop2 false,
+        TVar -> drop2 false,
+        THole -> drop2 false,
+        TMeta -> ==,
+        TTensor -> dip(type-has-meta? nip) swap if(drop2 true, type-has-meta),
+        TMorphism -> dip(type-has-meta? nip) swap if(drop2 true, type-has-meta),
+        TApp -> dip(type-has-meta? nip) swap if(drop2 true, type-has-meta),
+        TData -> drop2 false,
+        TTable -> drop2 false,
+        TValue -> match(
+            VALUE_INT -> drop2 false,
+            VALUE_STR -> drop2 false,
+            VALUE_BLOCK -> block-infer-type! type-has-meta
+                # TODO: handle deferred blocks
         )
     ))
 
+def(type-trace-sig!, Type -- +IO,
+    type-expand match(
+        TYPE_ERROR -> "<ERROR>" str-trace!,
+        TMorphism ->
+            swap
+            type-trace-stack-dom!
+            "--" str-trace!
+            type-trace-stack-cod!,
+        _ -> type-trace-stack!
+    ))
+
+def(type-trace-stack-dom!, Type -- +IO,
+    type-expand dup TYPE_UNIT == if(
+        drop,
+        type-trace-stack!
+        " " str-trace!
+    ))
+
+def(type-trace-stack-cod!, Type -- +IO,
+    type-expand dup TYPE_UNIT == if(
+        drop,
+        " " str-trace!
+        type-trace-stack!
+    ))
+
 def(type-trace-stack!, Type -- +IO,
-    type-is-tensor? if(
-        type-get-tensor dup
-        tensor-type-fst@
-        dup TYPE_UNIT == if(
-            drop,
-            type-trace-stack!
-            " " str-trace!
-        )
-        tensor-type-snd@ type-trace!,
-
-    type-is-stack-var? if(
-        type-trace!,
-
-        type-trace!
-        " ." str-trace!
-    )))
+    type-expand match(
+        TTensor ->
+            swap type-trace-stack-dom! type-trace!,
+        TVar ->
+            var-name@
+            dup name-trace!
+            name-could-be-stack-var
+            if(id, " ." str-trace!),
+        _ ->
+            type-trace!
+    ))
 
 def(type-trace!, Type -- +IO,
-    type-is-prim? if(
-        type-trace-prim!,
+    type-expand match(
+        TYPE_ERROR -> "<ERROR>" str-trace!,
+        TYPE_DONT_CARE -> "_" str-trace!,
+        TPrim -> type-trace-prim!,
+        TVar -> var-name@ name-trace!,
+        TMeta -> meta-trace!,
+        TTensor -> "[" str-trace! TTensor type-trace-stack! "]" str-trace!,
+        TMorphism -> "[" str-trace! TMorphism type-trace-sig! "]" str-trace!,
+        TData -> data-name@ name-trace!,
+        TTable -> table-name@ name-trace!,
+        THole -> name-trace!,
+        TApp -> app-type-trace!,
+        TValue -> value-trace!
+    ))
 
-    type-is-var? if(
-        type-get-var var-name@ name-load! str-buf-trace!,
+def(value-trace!, Value -- +IO,
+    match(
+        VALUE_INT -> int-trace!,
+        VALUE_STR -> drop "\"...\"" str-trace!,
+        VALUE_BLOCK -> drop "[...]" str-trace!,
+    ))
 
-    type-is-meta? if(
-        type-get-meta "?" str-trace! MetaVar->Int int-trace!,
+def(type-trace-prim!, PrimType -- +IO,
+    match(
+        PRIM_TYPE_TYPE -> "<TYPE>",
+        PRIM_TYPE_STACK -> "<STACK>",
+        PRIM_TYPE_EFFECT -> "<EFFECT>",
+        PRIM_TYPE_UNIT -> "[]",
+        PRIM_TYPE_BOOL -> "Bool",
+        PRIM_TYPE_INT -> "Int",
+        PRIM_TYPE_PTR -> "Ptr",
+        PRIM_TYPE_STR -> "Str",
+        PRIM_TYPE_CHAR -> "Char",
+        PRIM_TYPE_U8 -> "U8",
+        PRIM_TYPE_U16 -> "U16",
+        PRIM_TYPE_U32 -> "U32",
+        PRIM_TYPE_U64 -> "U64",
+        PRIM_TYPE_I8 -> "I8",
+        PRIM_TYPE_I16 -> "I16",
+        PRIM_TYPE_I32 -> "I32",
+        PRIM_TYPE_I64 -> "I64",
+    ) str-trace!)
 
-    type-is-tensor? if(
-        "[" str-trace!
-        type-trace-stack!
-        "]" str-trace!,
+||| Replace the stack rest with a metavar, if it's unit.
+def(type-semifreshen-sig, Type -- Type,
+    type-sig-needs-fresh-stack-rest? if(
+        type-semifreshen-sig-aux,
+        id
+    ))
 
-    type-is-morphism? if(
-        "[" str-trace!
-        type-trace-sig!
-        "]" str-trace!,
+def(type-semifreshen-sig-aux, Type -- Type,
+    type-expand match(
+        TMorphism ->
+            meta-alloc! TMeta rotr
+            dip(type-semifreshen-sig-stack) swap
+            dip(type-semifreshen-sig-stack) swap
+            TMorphism nip,
+        _ ->
+            id
+    ))
 
-    type-is-nominal? if(
-        type-get-nominal
-        nominal-name@
-        name-load!
-        str-buf-trace!,
-
-    type-is-data? if(
-        type-get-data
-        data-name@
-        name-load!
-        str-buf-trace!,
-
-    type-is-table? if(
-        type-get-table
-        table-name@
-        name-load!
-        str-buf-trace!,
-
-    type-is-hole? if(
-        type-get-hole-name
-        name-load!
-        str-buf-trace!,
-
-    type-is-app? if(
-        type-get-app
-        app-type-trace!,
-
-        "<UNKNOWN TYPE " str-trace! Type->Int int-trace! ">" str-trace!
-    )))))))))))
-
-def(type-trace-prim!, Type -- +IO,
-    dup TYPE_ERROR == if(
-        drop "ERROR" str-trace!,
-    dup TYPE_UNIT == if(
-        drop "[]" str-trace!,
-    dup TYPE_BOOL == if(
-        drop "Bool" str-trace!,
-    dup TYPE_INT == if(
-        drop "Int" str-trace!,
-    dup TYPE_PTR == if(
-        drop "Ptr" str-trace!,
-    dup TYPE_U8 == if(
-        drop "U8" str-trace!,
-    dup TYPE_U16 == if(
-        drop "U16" str-trace!,
-    dup TYPE_U32 == if(
-        drop "U32" str-trace!,
-    dup TYPE_U64 == if(
-        drop "U64" str-trace!,
-    dup TYPE_I8 == if(
-        drop "I8" str-trace!,
-    dup TYPE_I16 == if(
-        drop "I16" str-trace!,
-    dup TYPE_I32 == if(
-        drop "I32" str-trace!,
-    dup TYPE_I64 == if(
-        drop "I64" str-trace!,
-    dup TYPE_DONT_CARE == if(
-        drop "_" str-trace!,
-        "<UNKNOWN PRIMITIVE TYPE " str-trace! Type->Int int-trace! ">" str-trace!
-    )))))))))))))))
+def(type-semifreshen-sig-stack, Type Type -- Type Type,
+    type-expand match(
+        TTensor -> dip(type-semifreshen-sig-stack) TTensor,
+        TPrim ->
+            match(
+                PRIM_TYPE_UNIT -> dup,
+                _ -> TPrim
+            ),
+        _ -> id
+    ))
 
 ||| Freshen a type signature in preparation for type sig application.
 def(type-freshen-sig, Subst Type -- Subst Type,
@@ -528,234 +498,145 @@ def(type-freshen-sig, Subst Type -- Subst Type,
         type-freshen
     ))
 
+def(type-stack-rest, Type -- Type,
+    type-expand match(
+        TTensor -> drop type-stack-rest,
+        _ -> id
+    ))
+
 def(type-sig-needs-fresh-stack-rest?, Type -- Type Bool,
-    dup
-    type-expand type-is-param? if(type-get-param param-type-body@, id)
-    type-expand-morphism morphism-type-dom@
-    while(type-expand type-is-tensor?, type-get-tensor tensor-type-fst@)
-    TYPE_UNIT ==)
+    dup type-expand match(
+        TMorphism ->
+            type-stack-rest TYPE_UNIT == if(
+                type-stack-rest TYPE_UNIT ==,
+                drop false
+            ),
+        _ -> drop false
+    ))
 
 def(type-freshen-sig-aux, Subst Type -- Subst Type,
-    type-expand type-is-param? if(
-        type-get-param param-type-unpack
-        dip(param-freshen-aux drop) swap
-        dip(type-freshen-sig-aux) swap
-        T=>,
-
-        meta-alloc! TMeta rotr
-        type-expand-morphism morphism-type-unpack
-        dip(type-freshen-sig-stack) swap
-        dip(type-freshen-sig-stack) swap
-        T-> dip(nip)
+    type-expand match(
+        TMorphism ->
+            meta-alloc! TMeta rot4r
+            dip(type-freshen-sig-stack) swap
+            dip(type-freshen-sig-stack) swap
+            TMorphism dip(nip),
+        _ ->
+            type-freshen
     ))
 
 def(type-freshen-sig-stack, Type Subst Type -- Type Subst Type,
-    type-expand
-    type-is-tensor? if(
-        type-get-tensor tensor-type-unpack
-        dip(type-freshen-sig-stack) swap
-        dip(type-freshen) swap
-        T*,
-        drop over
+    type-expand match(
+        TTensor ->
+            dip(type-freshen-sig-stack) swap
+            dip(type-freshen) swap
+            TTensor,
+        TPrim ->
+            match(
+                PRIM_TYPE_UNIT -> over,
+                _ -> TPrim
+            ),
+        _ ->
+            type-freshen
     ))
 
 def(type-freshen, Subst Type -- Subst Type,
-    type-freshen-aux drop)
+    match(
+        TYPE_ERROR -> TYPE_ERROR,
+        TYPE_DONT_CARE -> TYPE_DONT_CARE,
+        TPrim -> TPrim,
+        THole -> THole,
+        TData -> TData,
+        TTable -> TTable,
+        TValue -> TValue, # no need to freshen values
+        TVar -> type-var-freshen,
+        TMeta -> meta-freshen,
+        TTensor -> type-pair-freshen TTensor,
+        TMorphism -> type-pair-freshen TMorphism,
+        TApp -> type-pair-freshen TApp,
+    ))
 
-def(type-freshen-aux, Subst Type -- Subst Type Bool,
-    type-expand
+def(type-pair-freshen, Subst Type Type -- Subst Type Type,
+    dip(type-freshen swap) type-freshen dip(swap))
 
-    type-is-var? if(
-        type-var-freshen,
+def(meta-freshen, Subst MetaVar -- Subst Type,
+    meta-is-defined? if(
+        meta-expand type-freshen,
+        drop meta-alloc! TMeta
+    ))
 
-    type-is-tensor? if(
-        type-get-tensor
-        tensor-type-freshen-aux
-        dip(TTensor),
-
-    type-is-morphism? if(
-        type-get-morphism
-        morphism-type-freshen-aux
-        dip(TMorphism),
-
-    type-is-param? if(
-        type-get-param
-        param-type-freshen-aux
-        dip(TParam),
-
-    type-is-app? if(
-        type-get-app
-        app-type-freshen-aux
-        dip(TApp),
-
-        true
-    ))))))
-
-def(type-var-freshen, Subst Type -- Subst Type Bool,
-    type-get-var
+def(type-var-freshen, Subst Var -- Subst Type,
     swap subst-has-var? if(
         tuck subst-get-var,
         meta-alloc! TMeta dup
         dip(rotr subst-new!)
-    )
-    false)
+    ))
 
 def(type-arity, Type -- Int,
-    type-expand
-    type-is-nominal? if(
-        type-get-nominal nominal-arity@,
+    type-expand match(
+        TData -> data-arity@,
+        TApp -> drop type-arity 1-,
+        _ -> drop 0,
+    ))
 
-    type-is-data? if(
-        type-get-data data-arity@,
+||| Get head of type.
+def(type-head, Type -- Type,
+    type-expand match(
+        TApp -> drop type-head,
+        _ -> id
+    ))
 
-        drop 0
-    )))
+||| For types that can have a field associated with them,
+||| get the number of values n, where the type's values
+||| range from 0 to (n-1). This should not be too large.
+|||
+||| Do NOT return SOME(n) unless the type has values 0..n-1
+def(type-max-count?, Type -- Type Maybe(Int),
+    dup match(
+        TApp -> drop type-max-count? nip,
+        TTable -> table-max-count@ 1+ SOME,
+        TData ->
+            data-is-enum? if(
+                data-tags@ len SOME,
+                drop NONE
+            ),
+        _ -> drop NONE
+    ))
 
 ##################
 # Meta-var Types #
 ##################
 
-def(Int->MetaVar, Int -- MetaVar, cast)
-def(MetaVar->Int, MetaVar -- Int, cast)
-
-def(meta-alloc!, MetaVar,
-    MetaVar.alloc!
-    dup MetaVar->Int MetaVar.MAX >= if(
-        "compiler error: ran out of meta variables, increase MAX_METAS" panic!,
-        id
-    ))
-
+def(meta-trace!, MetaVar -- +IO, "?" str-trace! MetaVar.id int-trace!)
+def(meta-alloc!, MetaVar, MetaVar.alloc!)
 def(meta-type!, Type MetaVar --, true over meta-is-defined! meta-type-raw!)
-def(meta-type@, MetaVar -- Type,
-    meta-is-defined? not if(
-        "attempted to access undefined metavar" panic!,
-        meta-type-raw@
-    ))
-
 def(meta-expand, MetaVar -- Type,
     meta-is-defined? if(
-        dup dip(meta-type@ type-expand dup) meta-type!,
+        dup dip(meta-type-raw@ type-expand dup) meta-type-raw!,
         TMeta
     ))
 
-def(meta-unify!, Type MetaVar -- Type,
+def(meta-unify!, Gamma Type MetaVar -- Gamma Type,
     meta-is-defined? if(
         meta-expand type-unify!,
 
+    dup2 TMeta == if(
+        drop,
+
     swap
     type-has-meta? if(
-        "failed to unify types" elab-emit-error!
-        drop
-        TYPE_ERROR swap meta-type!
-        TYPE_ERROR,
+        swap TMeta type-unify-failed!,
 
         swap dip(dup)
         meta-type!
-    )))
-
-################
-# Tensor Types #
-################
-
-def(Int->TensorType, Int -- TensorType, cast)
-def(TensorType->Int, TensorType -- Int, cast)
-def(tensor-type-new!, Type Type -- TensorType,
-    TensorType.alloc!
-    tuck tensor-type-snd!
-    tuck tensor-type-fst!)
-
-def(tensor-type-unify!, TensorType TensorType -- TensorType,
-    over tensor-type-fst@ over tensor-type-fst@ type-unify! over tensor-type-fst!
-    over tensor-type-snd@ over tensor-type-snd@ type-unify! over tensor-type-snd!
-    nip)
-
-def(tensor-type-unpack, TensorType -- Type Type,
-    dup dip(tensor-type-fst@) tensor-type-snd@)
-
-def(tensor-type-has-meta, MetaVar TensorType -- Bool,
-    tensor-type-unpack
-    dip(over) type-has-meta if(
-        drop2 true,
-        type-has-meta
-    ))
-
-def(tensor-type-freshen-aux, Subst TensorType -- Subst TensorType Bool,
-    dup
-    dip(
-        tensor-type-unpack
-        dip(type-freshen-aux)
-        dip(rotl) type-freshen-aux
-        dip(dip(rotr) swap) &&
-    )
-    swap if(
-        dip(drop2) true,
-        drop tensor-type-new! false
-    ))
-
-##################
-# Morphism Types #
-##################
-
-def(Int->MorphismType, Int -- MorphismType, cast)
-def(MorphismType->Int, MorphismType -- Int, cast)
-def(morphism-type-new!, Type Type -- MorphismType,
-    MorphismType.alloc!
-    tuck morphism-type-cod!
-    tuck morphism-type-dom!)
-
-def(morphism-type-unify!, MorphismType MorphismType -- MorphismType,
-    over morphism-type-dom@ over morphism-type-dom@ type-unify! over morphism-type-dom!
-    over morphism-type-cod@ over morphism-type-cod@ type-unify! over morphism-type-cod!
-    nip)
-
-def(morphism-type-unpack, MorphismType -- Type Type,
-    dup dip(morphism-type-dom@) morphism-type-cod@)
-
-def(morphism-type-has-meta, MetaVar MorphismType -- Bool,
-    morphism-type-unpack
-    dip(over) type-has-meta if(
-        drop2 true,
-        type-has-meta
-    ))
-
-def(morphism-type-freshen-aux, Subst MorphismType -- Subst MorphismType Bool,
-    dup
-    dip(
-        morphism-type-unpack
-        dip(type-freshen-aux)
-        dip(rotl) type-freshen-aux
-        dip(dip(rotr) swap) &&
-    )
-    swap if(
-        dip(drop2) true,
-        drop morphism-type-new! false
-    ))
-
-############
-# Nominals #
-############
-
-def(Int->Nominal, Int -- Nominal, cast)
-def(Nominal->Int, Nominal -- Int, cast)
-def(nominal-new!, Name Int Type -- Nominal,
-    Nominal.alloc!
-    tuck nominal-type!
-    tuck nominal-arity!
-    tuck nominal-name!)
-
-########
-# Data #
-########
-
-def(Data->Int, Data -- Int, cast)
-def(Int->Data, Int -- Data, cast)
+    ))))
 
 ##############
 # Type Holes #
 ##############
 
 def(type-hole-unify!, Type Name -- Type,
-    dup 0 Int->Name == if(
+    is-nil? if(
         drop,
         THole type-trace!
         " ~ " str-trace!
@@ -764,187 +645,131 @@ def(type-hole-unify!, Type Name -- Type,
     ))
 
 ##########
-# Tables #
-##########
-
-def(Table->Int, Table -- Int, cast)
-def(Int->Table, Int -- Table, cast)
-
-def(table-alloc!, Table,
-    Table.alloc!
-    dup Table->Int Table.MAX >= if(
-        "compiler error: NUM_TABLES >= MAX_TABLES" panic!,
-        id
-    ))
-
-##########
 # Params #
 ##########
 
-
-def(ParamType->Int, ParamType -- Int, cast)
-def(Int->ParamType, Int -- ParamType, cast)
-def(param-type-new!, Param Type -- ParamType,
-    ParamType.alloc!
-    tuck param-type-body!
-    tuck param-type-params!)
-def(param-type-unpack, ParamType -- Param Type,
-    param-type-params? swap
-    param-type-body@)
-
-def(Param->Int, Param -- Int, cast)
-def(Int->Param, Int -- Param, cast)
-def(param-new!, Type Param -- Param,
-    Param.alloc!
-    tuck param-next!
-    tuck param-type!)
-def(param-unpack, Param -- Type Param,
-    param-type? swap
-    param-next@)
-def(P0, Param, 0 Int->Param)
-def(P1, Type -- Param, P0 param-new!)
-def(P2, Type Type -- Param, P1 param-new!)
-def(P3, Type Type Type -- Param, P2 param-new!)
-def(param-empty?, Param -- Param Bool,
-    dup P0 ==)
-def(param-len, Param -- Int,
-    dip(0)
-    while(param-empty? not,
-        dip(1+) param-next@)
-    drop)
-
-def(type-num-params, Type -- Int,
-    type-expand
-    type-is-param? if(
-        type-get-param param-type-num-params,
-        drop 0
+def(type-max-num-params, Type -- Int,
+    type-expand match(
+        TMorphism -> drop type-num-morphisms-on-top,
+        _ -> drop 0
     ))
-def(param-type-num-params, ParamType -- Int,
-    param-type-params@ param-len)
 
-def(param-type-freshen-aux, Subst ParamType -- Subst ParamType Bool,
-    param-type-unpack
-    dip(param-freshen-aux drop) swap
-    dip(type-freshen-aux drop) swap
-    param-type-new! false)
-    # TODO: only generate new param-type when needed
-
-def(param-freshen-aux, Subst Param -- Subst Param Bool,
-    param-empty? if(
-        true,
-
-        param-unpack
-        dip(type-freshen-aux drop)
-        swap dip(param-freshen-aux drop)
-        swap param-new!
-        false
+def(type-num-morphisms-on-top, Type -- Int,
+    type-expand match(
+        TTensor ->
+            type-expand match(
+                TMorphism -> drop2 type-num-morphisms-on-top 1+,
+                _ -> drop2 0
+            ),
+        _ -> drop 0
     ))
-    # TODO: only generate new param when needed
 
 ############
 # APP TYPE #
 ############
 
-def(AppType->Int, AppType -- Int, cast)
-def(Int->AppType, Int -- AppType, cast)
-def(app-type-new!, Type Type -- AppType,
-    AppType.alloc!
-    tuck app-type-arg!
-    tuck app-type-fun!)
-def(app-type-unpack, AppType -- Type Type,
-    app-type-fun? swap
-    app-type-arg@)
-
-def(app-type-unify!, AppType AppType -- AppType,
-    over app-type-fun@ over app-type-fun@ type-unify! over app-type-fun!
-    over app-type-arg@ over app-type-arg@ type-unify! over app-type-arg!
-    nip)
-
-def(app-type-has-meta, MetaVar AppType -- Bool,
-    app-type-unpack
-    dip(over) type-has-meta if(
-        drop2 true,
-        type-has-meta
-    ))
-
-def(app-type-trace!, AppType --,
+def(app-type-trace!, Type Type --,
     app-type-trace-open! ")" str-trace!)
 
-def(app-type-trace-open!, AppType --,
-    app-type-unpack swap
-    type-is-app? if(
-        type-get-app
-        app-type-trace-open!
-        ", " str-trace!
-        type-trace!,
-
-        type-trace!
-        "(" str-trace!
-        type-trace!
-    ))
-
-def(app-type-freshen-aux, Subst AppType -- Subst AppType Bool,
-    dup
-    dip(
-        app-type-unpack
-        dip(type-freshen-aux)
-        dip(rotl) type-freshen-aux
-        dip(dip(rotr) swap) &&
-    )
-    swap if(
-        dip(drop2) true,
-        drop app-type-new! false
+def(app-type-trace-open!, Type Type --,
+    swap match(
+        TApp ->
+            app-type-trace-open!
+            ", " str-trace!
+            type-trace!,
+        _ ->
+            type-trace!
+            "(" str-trace!
+            type-trace!
     ))
 
 #########
 # Subst #
 #########
 
-def(Subst->Int, Subst -- Int, cast)
-def(Int->Subst, Int -- Subst, cast)
+# mirth/data/type
+data Subst
+    SUBST -> Map(Var, Type)
+end
 
-def(subst-alloc!, Subst,
-    Subst.alloc!
-    dup Subst->Int Subst.MAX >= if(
-        "NUM_SUBST >= MAX_SUBST" panic!,
-        id
-    ))
-def(subst-new!, Type Var Subst -- Subst,
-    subst-alloc!
-    tuck subst-rest!
-    tuck subst-var!
-    tuck subst-type!)
+unSUBST : Subst -- Map(Var, Type)
+unSUBST = match(SUBST -> id)
 
-def(SUBST_NIL, Subst, 0 Int->Subst)
-def(subst-is-nil, Subst -- Bool, SUBST_NIL ==)
-def(subst-is-nil?, Subst -- Subst Bool, dup subst-is-nil)
+subst-nil : Subst
+subst-nil = nil
 
-def(subst-has-var, Var Subst -- Bool,
-    subst-is-nil? if(
-        drop2 false,
-        dup2 subst-var@ == if(
-            drop2 true,
-            subst-rest@ subst-has-var
-        )
-    ))
-def(subst-has-var?, Var Subst -- Var Subst Bool,
-    dup2 subst-has-var)
+subst-is-nil : Subst -- Bool
+subst-is-nil = is-nil
 
-def(subst-get-var, Var Subst -- Type,
-    subst-is-nil? if(
-        drop2 TYPE_ERROR,
-        dup2 subst-var@ == if(
-            subst-type@ nip,
-            subst-rest@ subst-get-var
-        )
-    ))
-def(subst-get-var?, Var Subst -- Var Subst Type,
-    dup2 subst-get-var)
+subst-is-nil? : Subst -- Subst Bool
+subst-is-nil? = is-nil?
 
-# If variable is in subst, unify new type with type in subst.
-# Otherwise, create larger subst with new binding.
-def(subst-match-var, Type Var Subst -- Subst,
+subst-new! : Type Var Subst -- Subst
+subst-new! = unSUBST rotr pack2 map-insert SUBST
+
+subst-has-var : Var Subst -- Bool
+subst-has-var = unSUBST swap map-has
+
+subst-has-var? : Var Subst -- Var Subst Bool
+subst-has-var? = dup2 subst-has-var
+
+subst-get-var : Var Subst -- Type
+subst-get-var =
+    unSUBST swap map-lookup match(
+        NONE -> TYPE_ERROR,
+        SOME -> id
+    )
+
+subst-get-var? : Var Subst -- Var Subst Type
+subst-get-var? = dup2 subst-get-var
+
+||| If variable is in subst, unify new type with type in subst.
+||| Otherwise, create larger subst with new binding.
+subst-match-var : Gamma Type Var Subst -- Gamma Subst
+subst-match-var =
     subst-has-var? if(
         dup dip(subst-get-var type-unify! drop),
         subst-new!
-    ))
+    )
+
+
+
+#######
+# TAG #
+#######
+
+tag-num-inputs? : Tag -- Tag Int
+tag-num-inputs? =
+    # TODO: this should actually be calculated & stored during elaboration based on the type
+    tag-has-sig? if(
+        tag-sig? 0 swap
+        while(token-run-end? not, token-next dip(1+)) drop,
+        0
+    )
+
+tag-is-transparent? : Tag -- Tag Bool
+tag-is-transparent? = tag-data? data-is-transparent? nip
+
+########
+# DATA #
+########
+
+data-num-tags : Data -- Int
+data-num-tags = data-tags@ len
+
+||| Adds constructor to data type, and gives tag its rank.
+data-add-tag! : Tag Data -- +Mirth
+data-add-tag! = (
+    dup2 data-num-tags swap tag-value!
+    data-tags? rotr dip(snoc) data-tags!
+)
+
+data-is-enum? : Data -- Data Bool
+data-is-enum? = data-tags? all?(tag-num-inputs? 0 ==) nip
+
+data-is-transparent? : Data -- Data Bool
+data-is-transparent? =
+    data-tags? match(
+        L1 -> tag-num-inputs? 1 == nip,
+        _ -> drop false
+    )

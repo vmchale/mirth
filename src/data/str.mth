@@ -1,0 +1,232 @@
+module(data.str)
+import(data.list)
+import(data.char)
+import(prelude)
+
+str-head : Str -- Char
+str-head = Str->Ptr char@
+
+str-head-width : Str -- Int
+str-head-width = Str->Ptr char@-width
+
+str-tail : Str -- Str
+str-tail = dup dip(str-head-width) Str->Ptr ptr+ Ptr->Str
+
+str-size? : Str -- Str Int
+str-size? = prim.str.size
+
+str-size : Str -- Int
+str-size = prim.str.size dip(drop)
+
+str-length : Str -- Int
+str-length =
+    0 swap while(
+        str-is-empty? not,
+        dip(1+) str-tail
+    ) drop
+
+str-length? : Str -- Str Int
+str-length? = dup str-length
+
+str-concat : List(Str) -- Str
+str-concat = (
+    dup 0 swap for(str-size +)
+    prim.str.alloc dup dip(
+        prim.str.base
+        swap for(swap str-copy-partial!)
+        nil swap u8!
+    )
+)
+
+str-cat : Str Str -- Str
+str-cat = L2 str-concat
+
+str-is-empty : Str -- Bool
+str-is-empty = is-nil? if(drop true, str-head is-nil)
+
+str-is-empty? : Str -- Str Bool
+str-is-empty? = dup str-is-empty
+
+||| Copy string bytes to second argument without adding 0 at end.
+||| Return first unwritten location in second argument.
+str-copy-partial! : Str Ptr -- Ptr
+str-copy-partial! = (
+    dip(dup Str->Ptr swap str-size)
+    dup2 ptr+ dip(prim.ptr.copy)
+)
+
+STR_BUF_SIZE : Int
+STR_BUF_SIZE = 0x2000
+buffer(STR_BUF, 0x2000)
+buffer(STR_BUF_LEN, 8)
+
+build-str! : *a [ *a -- *b ] -- *b Str
+build-str! = \([f] ->
+    str-buf-dup! str-buf-clear! dip(
+        f str-buf-dup!
+    ) str-buf!
+)
+
+str-buf-dup! : Str
+str-buf-dup! = (
+    STR_BUF str-buf-length? dup prim.str.alloc
+    dup dip(prim.str.base prim.ptr.copy)
+)
+
+str-buf-length? : Int +StrBuf
+str-buf-length? = STR_BUF_LEN int@
+
+str-buf-length! : Int -- +StrBuf
+str-buf-length! = (
+    dup STR_BUF_LEN int!
+    dip(0 Int->U8) str-buf-u8!
+)
+
+str-buf-u8@ : Offset -- U8 +StrBuf
+str-buf-u8@ = STR_BUF u8@@
+
+str-buf-u8! : U8 Offset -- +StrBuf
+str-buf-u8! = STR_BUF u8!!
+
+str-buf-char@ : Offset -- Char +StrBuf
+str-buf-char@ = STR_BUF ptr+ char@
+
+str-buf-empty? : Bool +StrBuf
+str-buf-empty? = str-buf-length? 0=
+
+str-buf-full? : Bool +StrBuf
+str-buf-full? = str-buf-length? 1+ STR_BUF_SIZE >=
+
+str-buf-clear! : +StrBuf
+str-buf-clear! = 0 str-buf-length!
+
+str-buf-push-u8! : U8 -- +StrBuf
+str-buf-push-u8! = (
+    # str-buf-full? not if(
+        str-buf-length? str-buf-u8!
+        str-buf-length? 1+ str-buf-length!
+    #     "str-buf-push! but STR_BUF is already full" panic!
+    # )
+)
+
+str-buf-push-char! : Char -- +StrBuf
+str-buf-push-char! = (
+    dup str-buf-length? STR_BUF ptr+ char!
+    char-width str-buf-length? + str-buf-length!
+)
+
+||| Append the given string into STR_BUF. If the string is
+||| too large it gets truncated.
+str-buf-push-str! : Str -- +StrBuf
+str-buf-push-str! = dup Str->Ptr swap str-size str-buf-push-ptr!
+
+str-buf-push-ptr! : Ptr Size -- +StrBuf
+str-buf-push-ptr! = (
+    tuck str-buf-length? STR_BUF ptr+ prim.ptr.copy
+    str-buf-length? + str-buf-length!
+)
+
+||| Set the STR_BUF to a given string. If the string is
+||| too large it gets truncated.
+str-buf! : Str -- +StrBuf
+str-buf! = str-buf-clear! str-buf-push-str!
+
+str-buf-char! : Char -- +StrBuf
+str-buf-char! = dup STR_BUF char! char-width str-buf-length!
+
+to-digit : Int -- Char
+to-digit = 10 % 48 + Int->Char
+
+||| Put integer into STR_BUF.
+str-buf-int! : Int -- +StrBuf
+str-buf-int! =
+    dup 0= if(
+        drop "0" str-buf!,
+        dup dip(
+            abs
+            str-buf-clear!
+            while(dup nonzero, dup to-digit str-buf-push-char! 10 /) drop
+        ) 0 < if(45 Int->Char str-buf-push-char!, id)
+        str-buf-reverse!
+    )
+
+int-show : Int -- Str
+int-show = build-str!(str-buf-int!)
+
+||| Swap two bytes in STR_BUF.
+str-buf-swap-u8! : Int Int -- +StrBuf
+str-buf-swap-u8! = (
+    dup2 swap
+    dip3(str-buf-u8@)
+    dip(str-buf-u8@)
+    str-buf-u8! str-buf-u8!
+)
+
+||| Reverse contents of STR_BUF bytewise.
+str-buf-reverse! : +StrBuf
+str-buf-reverse! = (
+    0 str-buf-length? 1-
+    while(dup2 <,
+        dup2 str-buf-swap-u8!
+        dip(1+) 1-
+    )
+    drop2
+)
+
+||| Are two strings equal?
+str-eq : Str Str -- Bool
+str-eq = prim.str.eq
+
+||| Are two strings equal? Preserve pointers.
+str-eq? : Str Str -- Str Str Bool
+str-eq? = dup2 str-eq
+
+||| Traverse string characters.
+str-for : *a Str [*a Char -- *a] -- *a
+str-for = \([f] ->
+    while(str-is-empty? not,
+        dup str-tail
+        dip(str-head f)
+    ) drop
+)
+
+data TransducerStep
+    TS_STOP
+    TS_SKIP
+    TS_CHAR -> Char
+    TS_PUSH -> List(Char)
+    TS_COPY -> Str
+end
+
+str-transduce : *a Str [ *a Char -- *a TransducerStep ] -- *a Str
+str-transduce = \([f] ->
+    build-str!(
+        while(str-is-empty? not,
+            dup dip(str-head f) str-tail
+            swap match(
+                TS_STOP -> drop "",
+                TS_SKIP -> id,
+                TS_CHAR -> str-buf-push-char!,
+                TS_PUSH -> for(str-buf-push-char!),
+                TS_COPY -> str-buf-push-str!
+            )
+        ) drop
+    )
+)
+
+str-chars : Str -- List(Char)
+str-chars = dip(L0) str-for(snoc)
+
+str-codepoints : Str -- List(Int)
+str-codepoints = dip(L0) str-for(char-codepoint snoc)
+
+str-bytes : Str -- List(U8)
+str-bytes = (
+    L0 swap
+    dup Str->Ptr swap str-size
+    while(
+        dup 0 >,
+        1- dip(dup dip(u8@ snoc 1) ptr+)
+    )
+    drop2
+)

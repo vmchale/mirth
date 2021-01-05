@@ -1,29 +1,34 @@
-module(mirth/data/location)
-import(mirth/data/module)
+module(mirth.data.location)
+import(mirth.data.module)
+
+# mirth/data/location
+data(Row, ROW -> Int)
+data(Col, COL -> Int)
+data(Location, LOCATION -> Module Row Col)
 
 Int->Row : Int -- Row
-Int->Row = Row.wrap
+Int->Row = ROW
 
 Row->Int : Row -- Int
-Row->Int = Row.unwrap
+Row->Int = match(ROW -> id)
 
 Int->Col : Int -- Col
-Int->Col = Col.wrap
+Int->Col = COL
 
 Col->Int : Col -- Int
-Col->Int = Col.unwrap
+Col->Int = match(COL -> id)
 
 location-pack : Module Row Col -- Location
-location-pack = pack3 Location.wrap
+location-pack = LOCATION
 
 location-unpack : Location -- Module Row Col
-location-unpack = Location.unwrap unpack3
+location-unpack = match(LOCATION -> id)
 
 location-trace! : Location -- +IO
 location-trace! = (
     location-unpack
     rotr swap
-    load-module-source-path! str-buf-trace!
+    module-source-path Path->Str str-trace!
     ":" str-trace!
     Row->Int int-trace!
     ":" str-trace!

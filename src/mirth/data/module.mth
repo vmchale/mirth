@@ -1,29 +1,18 @@
-module(mirth/data/module)
-import(mirth/data/common)
-import(mirth/data/path)
+module(mirth.data.module)
+import(data.path)
+import(data.set)
 
-Module->Int : Module -- Int
-Module->Int = cast
-
-Int->Module : Int -- Module
-Int->Module = cast
-
-MAX_MODULES : Size
-MAX_MODULES = 0x200
-
-MODULE_PATH_SIZE : Size
-MODULE_PATH_SIZE = 0x200
-
-buffer(MODULE_PATH_BUF, 0x40000)
+# mirth/data/module
+table(Module)
+table(Token)
+field(module-name, Module, Name)
+field(module-path, Module, Path)
+field(module-start, Module, Token)
+field(module-end, Module, Token)
+field(module-imports, Module, Set(Module))
 
 module-alloc! : Module
-module-alloc! = (
-    Module.alloc!
-    dup Module->Int MAX_MODULES >= if(
-        "Module.NUM @ >= MAX_MODULES" panic!,
-        id
-    )
-)
+module-alloc! = Module.alloc!
 
 module-new! : Path -- Module
 module-new! = (
@@ -31,32 +20,24 @@ module-new! = (
     tuck module-path!
 )
 
-module-path@ : Module -- Path
-module-path@ = Module->Int MODULE_PATH_SIZE * MODULE_PATH_BUF ptr+ Str->Path
-
-module-path? : Module -- Module Path
-module-path? = dup module-path@
-
-module-path! : Path Module --
-module-path! =
-    over Path->Str str-length MODULE_PATH_SIZE >= if(
-        "Module path is too long!" panic!,
-        module-path@ dip(Path->Str) Path->Str str-copy!
+||| Get source path associated with module.
+module-source-path : Module -- Path
+module-source-path =
+    is-nil? if(
+        drop "<generated>" Str->Path,
+        module-path@ make-source-path
     )
 
-# Load a source path associated with a module into STR_BUF.
-load-module-source-path! : Module --
-load-module-source-path! =
-    module-path@ load-source-path!
-
-NameValue->Module : NameValue -- Module
-NameValue->Module = NameValue->Int Int->Module
-
-Module->NameValue : Module -- NameValue
-Module->NameValue = Module->Int Int->NameValue
-
-name-module! : Module Name --
-name-module! = (
-    DEF_MODULE over name-sort!
-    dip(Module->NameValue) name-value!
-)
+||| Get expected module path from module name, relative to src.
+module-path-from-name : Name -- Path
+module-path-from-name =
+    name-str@ str-transduce(
+        is-dot? if(
+            drop "/" # path-separator # TODO: this should be path-separator, but breaks module import check on MSYS2 ... fix module import check / paths?
+            TS_COPY,
+        is-upper? if(# TODO: be more specific -- is-upper-ascii?
+            Char->Int 0x20 | Int->Char TS_CHAR,
+            TS_CHAR
+#            "--///error///--" TS_COPY
+        ))
+    ) ".mth" str-cat Str->Path

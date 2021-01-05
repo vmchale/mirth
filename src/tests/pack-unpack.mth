@@ -1,5 +1,9 @@
-module(tests/pack-unpack)
+module(tests.pack-unpack)
 import(prelude)
+import(platform.posix)
+
+def(!!true, Bool --, if(id, "Assertion failed" panic!))
+def(!!=, a a --, == !!true)
 
 def(mk-int-pack, [Int Int], 10 20 pack2)
 def(swap-int-pack, [a b] -- [b a], unpack2 swap pack2)
@@ -14,12 +18,12 @@ def(main, --,
     sub-int-pack
     -10 !!=)
 target-c99("pack-unpack.c", main)
-# mirth-test # perr # ?? 1
+# mirth-test # perr # ?? 42949672980
 # mirth-test # perr # ?? 10 20
-# mirth-test # perr # ?? 2
+# mirth-test # perr # ?? 42949672980
 # mirth-test # perr # ?? 10 20
-# mirth-test # perr # ?? 3
+# mirth-test # perr # ?? 42949672980
 # mirth-test # perr # ?? 10 20
-# mirth-test # perr # ?? 4 10 20
-# mirth-test # perr # ?? 5 20 10
-# mirth-test # perr # ?? 6 10 20
+# mirth-test # perr # ?? 42949672980 10 20
+# mirth-test # perr # ?? 85899345930 20 10
+# mirth-test # perr # ?? 42949672980 10 20

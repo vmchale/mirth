@@ -1,0 +1,61 @@
+module(data.path)
+import(data.str)
+import(prelude)
+
+data(Path, PATH -> Str)
+
+Str->Path : Str -- Path
+Str->Path = PATH
+
+Path->Str : Path -- Str
+Path->Str = match(PATH -> id)
+
+path@ : Ptr -- Path
+path@ = ptr@ Ptr->Str Str->Path
+
+path! : Path Ptr --
+path! = dip(Path->Str Str->Ptr) ptr!
+
+init-paths! : --
+init-paths! = (
+    "src" Str->Path source-path-root!
+    "bin" Str->Path output-path-root!
+)
+
+buffer(SOURCE_PATH_ROOT, 8)
+
+source-path-root@ : Path
+source-path-root@ = SOURCE_PATH_ROOT path@
+
+source-path-root! : Path --
+source-path-root! = SOURCE_PATH_ROOT path!
+
+buffer(OUTPUT_PATH_ROOT, 8)
+
+output-path-root@ : Path
+output-path-root@ = OUTPUT_PATH_ROOT path@
+
+output-path-root! : Path --
+output-path-root! = OUTPUT_PATH_ROOT path!
+
+path-separator : Str
+path-separator = RUNNING_OS OS_WINDOWS == if("\\", "/")
+
+path-is-empty? : Path -- Path Bool
+path-is-empty? = dup Path->Str str-is-empty
+
+path-join : Path Path -- Path
+path-join =
+    swap path-is-empty? if(
+        drop,
+        Path->Str path-separator rotl Path->Str
+        L3 str-concat Str->Path
+    )
+
+||| Make a source path from a project-relative path.
+make-source-path : Path -- Path
+make-source-path = source-path-root@ swap path-join
+
+||| Make an output path from a project-relative path.
+make-output-path : Path -- Path
+make-output-path = output-path-root@ swap path-join

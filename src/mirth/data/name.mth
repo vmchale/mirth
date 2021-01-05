@@ -1,272 +1,175 @@
-module(mirth/data/name)
-import(mirth/data/common)
-import(mirth/lexer/char)
+module(mirth.data.name)
+import(data.char)
 
 #########
 # Names #
 #########
 
-def(Name->Int, Name -- Int, cast)
-def(Int->Name, Int -- Name, cast)
-def(|Name|, Size, 8)
-def(name@, Ptr -- Name, @ Int->Name)
-def(name!, Name Ptr --, dip(Name->Int) !)
+# mirth/data/name
+data NameValue
+    DEF_NONE
+    DEF_MODULE -> Module
+    DEF_TYPE -> Type
+    DEF_TAG -> Tag
+    DEF_PRIM -> Prim
+    DEF_WORD -> Word
+    DEF_BUFFER -> Buffer
+    DEF_EXTERNAL -> External
+end
+table(Name)
+field(name-str, Name, Str)
+field(name-value, Name, NameValue)
+field(name-mangle-cached, Name, Str)
 
-nominal(Hash, Int)
-def(Int->Hash, Int -- Hash, Hash.wrap)
-def(Hash->Int, Hash -- Int, Hash.unwrap)
+data(Hash, HASH -> Int)
+def(Int->Hash, Int -- Hash, HASH)
+def(Hash->Int, Hash -- Int, match(HASH -> id))
 
-def(MAX_NAMES, Size, 0x4000)
-def(NAME_HASH_MAX, Size, 0x3FFF)
-def(NAME_TABLE_SIZE, Size, NAME_HASH_MAX 1+)
-buffer(NAME_TABLE, 0x20000)
+buffer(NAME_HASH_TABLE, 0x80000)
+def(NAME_HASH_MAX, Size, 0x7FFF)
+def(hash-name!, Name Hash --, Hash->Int NAME_HASH_TABLE value!!)
+def(hash-name@, Hash -- Name, Hash->Int NAME_HASH_TABLE value@@)
+def(hash-name?, Hash -- Hash Name, dup hash-name@)
 
-def(num-names@, Size, Name.NUM @)
-
-def(NAME_QUADS, Size, 8)
-def(NAME_SIZE, Size, NAME_QUADS ints)
-def(NAME_BUF_SIZE, Size, NAME_SIZE MAX_NAMES *)
-buffer(NAME_BUF, 0x100000)
-
-# Load a name into STR_BUF.
-def(name-load!, Name --,
-    name-quads-load!
-    NAME_SIZE str-buf-length!
-    STR_BUF str-length str-buf-length!)
-
-def(name-quads&, Name -- Ptr,
-    Name->Int NAME_SIZE * NAME_BUF ptr+)
-
-# Compare all quads in name to STR_BUF.
-# Note this code assumes NAME_QUADS is 8.
-def(name-quads-eq, Name -- Bool,
-    name-quads&
-    0 over @@ 0 STR_BUF @@ == if(
-    1 over @@ 1 STR_BUF @@ == if(
-    2 over @@ 2 STR_BUF @@ == if(
-    3 over @@ 3 STR_BUF @@ == if(
-    4 over @@ 4 STR_BUF @@ == if(
-    5 over @@ 5 STR_BUF @@ == if(
-    6 over @@ 6 STR_BUF @@ == if(
-    7 swap @@ 7 STR_BUF @@ ==,
-    drop false), drop false), drop false), drop false),
-    drop false), drop false), drop false))
-
-def(hash, Ptr -- Hash,
+||| Get hash for string.
+def(hash, Str -- Hash,
     0 swap
-    while(dup u8@ U8->Int nonzero,
-        dup dip(u8@ U8->Int 5 * swap 18 * ^)
-        str-tail)
+    while(str-is-empty? not,
+        dup str-tail
+        dip(str-head Char->Int 5 * swap 18 * ^))
     drop
     NAME_HASH_MAX &
     Int->Hash)
 
-def(name-hash, Name -- Hash,
-    name-quads& hash)
-
-def(name-quads-eq?, Name -- Name Bool,
-    dup name-quads-eq)
-
-def(name-quad-save!, Name Int --,
-    dip(name-quads&) tuck
-    STR_BUF @@ rotr !!)
-
-def(name-quads-save!, Name -- ,
-    dup 0 name-quad-save!
-    dup 1 name-quad-save!
-    dup 2 name-quad-save!
-    dup 3 name-quad-save!
-    dup 4 name-quad-save!
-    dup 5 name-quad-save!
-    dup 6 name-quad-save!
-    7 name-quad-save!)
-
-def(name-quads-load!, Name --,
-    name-quads&
-    0 over @@ 0 STR_BUF !!
-    1 over @@ 1 STR_BUF !!
-    2 over @@ 2 STR_BUF !!
-    3 over @@ 3 STR_BUF !!
-    4 over @@ 4 STR_BUF !!
-    5 over @@ 5 STR_BUF !!
-    6 over @@ 6 STR_BUF !!
-    7 over @@ 7 STR_BUF !!
-    drop)
-
-# zero str-buf up to NAME_SIZE
-def(str-buf-zero!, --,
-    0 0 STR_BUF !!
-    0 1 STR_BUF !!
-    0 2 STR_BUF !!
-    0 3 STR_BUF !!
-    0 4 STR_BUF !!
-    0 5 STR_BUF !!
-    0 6 STR_BUF !!
-    0 7 STR_BUF !!)
-
-def(name-table@, Hash -- Name, Hash->Int NAME_TABLE @@ Int->Name)
-def(name-table!, Name Hash --, dip(Name->Int) Hash->Int NAME_TABLE !!)
+def(name-hash, Name -- Hash, name-str@ hash)
 def(next-hash, Hash -- Hash, Hash->Int 1+ NAME_HASH_MAX & Int->Hash)
 
-def(name-is-error, Name -- Bool, NAME_ERROR ==)
-def(name-is-error?, Name -- Name Bool, dup name-is-error)
-
-def(name-save-keep-going?, Hash -- Hash Bool,
-    dup name-table@
-    name-is-error? if(
+def(name-keep-going?, Str Hash -- Str Hash Bool,
+    hash-name? is-nil? if(
         drop false,
-        name-quads-eq not
+        dip(over) name-str@ str-eq not
     ))
 
-# Load STR_BUF into name table. Performs deduplication.
-def(name-save!, -- Name,
-    STR_BUF hash
-    while(name-save-keep-going?, next-hash)
-    dup name-table@
-    name-is-error? if(
-        drop
-        Name.alloc!
-        dup dip(swap name-table!)
-        dup name-quads-save!,
-        nip
-    ))
 
 def(name-new!, Str -- Name,
-    str-buf-zero! str-buf! name-save!)
+    dup hash
+    while(name-keep-going?, next-hash)
+    hash-name? is-nil? if(
+        drop Name.alloc!
+        tuck swap hash-name!
+        tuck name-str!,
+        nip nip
+    ))
 
-buffer(name-bytes, 8) # TODO: get rid of this
-def(show-names-table!, +Names +IO,
-    0 name-bytes !
-    0
-    while(dup num-names@ <,
-        dup int-print!
-        ": " str-print!
-        dup Int->Name name-load!
-        str-buf-length? name-bytes @ + 1+ name-bytes !
-        STR_BUF str-print! " " str-print!
-        dup Int->Name name-hash Hash->Int int-print! print-ln!
-        1+
-    )
-    drop
-    "Total bytes: " str-print!
-    name-bytes @ int-print-ln!)
+||| Add string to name, creating new name.
+name-cat! : Name Str -- Name
+name-cat! = dip(name-str@) str-cat name-new!
+
+name-trace! : Name -- +IO
+name-trace! = name-str@ str-trace!
+
+name-print! : Name -- +IO
+name-print! = name-str@ str-print!
 
 def(name-could-be-type, Name -- Bool,
-    name-quads& u8@ is-alpha? nip)
+    name-str@ str-head is-alpha? nip)
 
 def(name-could-be-type-var, Name -- Bool,
-    name-quads& str-could-be-type-var)
+    name-str@ str-could-be-type-var)
 
 def(str-could-be-type-var, Str -- Bool,
-    u8@ is-lower? nip)
+    str-head is-lower? nip)
 
 def(name-could-be-type-con, Name -- Bool,
-    name-quads& u8@ is-upper? nip)
+    name-str@ str-head is-upper? nip)
 
 def(name-is-type-hole, Name -- Bool,
-    name-quads& dup u8@ is-question-mark? nip if(
-        str-tail dup str-null if(
+    name-str@ dup str-head is-question-mark? nip if(
+        str-tail str-is-empty? if(
             drop true,
             str-could-be-type-var),
         drop false
     ))
 
-def(name-is-type-dont-care, Name -- Bool,
-    name-quads& dup u8@ is-underscore? nip if(
-        str-tail str-null,
+def(name-is-underscore, Name -- Bool,
+    name-str@ dup str-head is-underscore? nip if(
+        str-tail str-is-empty,
         drop false
     ))
 
 def(name-could-be-stack-var, Name -- Bool,
-    name-quads& dup u8@ is-asterisk? nip if(
+    name-str@ dup str-head is-asterisk? nip if(
         str-tail str-could-be-type-var,
         drop false
     ))
 
 def(name-could-be-effect-con, Name -- Bool,
-    name-quads& dup u8@ is-plus-sign? nip if(
-        str-tail u8@ is-upper? nip,
+    name-str@ dup str-head is-plus? nip if(
+        str-tail str-head is-upper? nip,
         drop false
     ))
 
 def(name-print-mangled!, Name -- +IO,
-    name-mangle! STR_BUF str-print!)
+    name-mangle! str-print!)
 
-def(name-mangle!, Name -- +StrBuf,
-    str-buf-clear!
-    name-quads& 0
-    while(dup NAME_SIZE <,
-        over u8@
-        str-buf-push-mangled!
-        dip(str-tail) 1+)
-    drop2)
-
-def(str-buf-push-mangled!, Char -- +StrBuf,
-    is-nul? if(
-        drop,
-
-    is-alpha? if(
-        str-buf-push!,
-
-    is-digit? if(
-        str-buf-push!,
-
-    is-dash? if(
-        drop
-        underscore str-buf-push!, # technically bad but looks nice for now
-
-    is-underscore? if(
-        str-buf-push!, # technically bad but looks nice for now
-
-        underscore str-buf-push!
-        str-buf-push-hexdigits!
-        underscore str-buf-push!
-    ))))))
-
-def(str-buf-push-hexdigits!, Char -- +StrBuf,
-    U8->Int dup
-    16 / Int->U8 str-buf-push-hexdigit!
-    16 % Int->U8 str-buf-push-hexdigit!)
-
-def(str-buf-push-hexdigit!, Char -- +StrBuf,
-    U8->Int dup 10 >= if(
-        55 + Int->U8 str-buf-push!,
-        48 + Int->U8 str-buf-push!
+def(name-mangle!, Name -- Str,
+    name-mangle-cached? is-nil? if(
+        drop dup dip(name-mangle-compute! dup) name-mangle-cached!,
+        nip
     ))
 
-###################
-# Primitive Names #
-###################
+def(name-mangle-compute!, Name -- Str,
+    name-str@ str-transduce(
+        is-alpha? if( TS_CHAR,
+        is-digit? if( TS_CHAR,
+        is-underscore? if( TS_CHAR,
+        is-dash? if( drop underscore TS_CHAR,
+            char-hexdigits underscore swap cons underscore snoc TS_PUSH
+        ))))
+    ))
 
-def(NAME_ERROR, Name, 0 Int->Name)
+||| Turn character into a sequence of hex digits, in the order they
+||| appear in UTF8 encoding.
+def(char-hexdigits, Char -- List(Char),
+    Char->Int
+    char-hexdigits-first
+    while(dup 0 >, char-hexdigits-next)
+    drop)
 
+def(char-hexdigits-first, Int -- List(Char) Int,
+    dip(L0) char-hexdigits-next)
 
+def(char-hexdigits-next, List(Char) Int -- List(Char) Int,
+    dup dip(0xF & hexdigit) 4 >>
+    dup dip(0xF & hexdigit) 4 >>
+    dip(swap dip(snoc) snoc))
+
+def(hexdigit, Int -- Char,
+    dup 10 >= if(
+        55 + Int->Char,
+        48 + Int->Char
+    ))
 
 ########
 # Defs #
 ########
 
-def(NameValue->Int, NameValue -- Int, NameValue.unwrap)
-def(Int->NameValue, Int -- NameValue, NameValue.wrap)
-
-def(NameSort->U8, NameSort -- U8, NameSort.unwrap)
-def(U8->NameSort, U8 -- NameSort, NameSort.wrap)
-def(Int->NameSort, Int -- NameSort, Int->U8 U8->NameSort)
-def(DEF_NONE, NameSort, 0 Int->NameSort)
-def(DEF_WORD, NameSort, 1 Int->NameSort)
-def(DEF_BUFFER, NameSort, 2 Int->NameSort)
-def(DEF_TYPE, NameSort, 3 Int->NameSort)
-def(DEF_EXTERNAL, NameSort, 4 Int->NameSort)
-def(DEF_MODULE, NameSort, 5 Int->NameSort)
-def(DEF_PRIM, NameSort, 6 Int->NameSort)
-def(DEF_TAG, NameSort, 7 Int->NameSort)
-
-def(name-undefined?, Name -- Name Bool, name-sort? DEF_NONE ==)
+def(name-undefined?, Name -- Name Bool,
+    name-value? match(DEF_NONE -> true, _ -> drop false))
 def(name-defined?, Name -- Name Bool, name-undefined? not)
-def(name-is-word?, Name -- Name Bool, name-sort? DEF_WORD ==)
-def(name-is-buffer?, Name -- Name Bool, name-sort? DEF_BUFFER ==)
-def(name-is-type?, Name -- Name Bool, name-sort? DEF_TYPE ==)
-def(name-is-external?, Name -- Name Bool, name-sort? DEF_EXTERNAL ==)
-def(name-is-module?, Name -- Name Bool, name-sort? DEF_MODULE ==)
-def(name-is-prim?, Name -- Name Bool, name-sort? DEF_PRIM ==)
-def(name-is-tag?, Name -- Name Bool, name-sort? DEF_TAG ==)
+
+name-word! : Word Name --
+name-buffer! : Buffer Name --
+name-type! : Type Name --
+name-external! : External Name --
+name-module! : Module Name --
+name-prim! : Prim Name --
+name-tag! : Tag Name --
+
+name-word! = dip(DEF_WORD) name-value!
+name-buffer! = dip(DEF_BUFFER) name-value!
+name-type! = dip(DEF_TYPE) name-value!
+name-external! = dip(DEF_EXTERNAL) name-value!
+name-module! = dip(DEF_MODULE) name-value!
+name-prim! = dip(DEF_PRIM) name-value!
+name-tag! = dip(DEF_TAG) name-value!
